@@ -119,6 +119,11 @@ span.pname{min-width:0;color:var(--dim)}
     <label title="Begin each line of music where the printed score began it"><input type="checkbox" id="origChk" checked> Lines as printed</label>
   </div>
   <div class="controls">
+    <label title="Read these bars again from the printed page, each on its own">Re-scan bars <input type="number" id="rsFrom" min="1" style="width:60px"> to <input type="number" id="rsTo" min="1" style="width:60px"></label>
+    <button id="rsGo">Re-scan from the page</button>
+    <button id="rsUndo" style="display:none">Undo re-scan</button>
+  </div>
+  <div class="controls">
     <label>Transpose <select id="trAmt"></select></label>
     <select id="trWhat" title="What moves"><option value="both">score and sound</option><option value="score">score only (the sound stays)</option><option value="sound">sound only (the score stays)</option></select>
     <button id="trGo">Transpose</button>
@@ -167,7 +172,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.1';
+const APP_VERSION='5.2';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -870,6 +875,7 @@ function setSel(i){
   const prev=sc.sel;
   sc.sel=i;sc.cur=i+1;const it=sc.items[i],r=repOf(it.d);sc.bi=r.bi;sc.dots=r.d;buildPalette();
   if(it.m!=null){play(it.m);lightNeck(it.m);}
+  {const bn=barNoOf(i);if(bn&&document.activeElement!==$('rsFrom')&&document.activeElement!==$('rsTo')){$('rsFrom').value=bn;$('rsTo').value=bn;}}
   // only the colour changes, so repaint two notes instead of drawing the whole score again (long scores, iPad)
   if(noteEls.has(i)&&!rec.on){paintNote(prev,null);paintNote(i,'#1f5fbf');selEl=noteEls.get(i)[0];}
   else drawRecording();
@@ -1889,7 +1895,7 @@ function addScannedPoly(all,pages,override){
   else made.forEach((m,i)=>{const p=sc.parts[i]||(sc.parts[i]=newPart(m.name,m.clef,m.sound,m.pan));p.hist.push(JSON.stringify(p.items));p.items=p.items.concat(m.items);});
   sc.pi=0;sc.sel=-1;sc.cur=sc.items.length;
   if(fresh){
-    sc.neckPart=0;
+    sc.neckPart=0;sc.scanName=scan.name;sc.trS=0;sc.tr=0;
     {const mk=made.flatMap(m=>m.items).find(x=>x.tx&&/=\s*\d+/.test(x.tx)),n=mk?+/=\s*(\d+)/.exec(mk.tx)[1]:0;if(n>=30&&n<=240){sc.bpm=n;$('bpm').value=n;}}
     const f=pages.flatMap(pg=>pg.staves).find(s=>s.pe&&s.pe.length);
     const k=f?(f.keyFinal!=null?f.keyFinal:f.fifths):null;
@@ -1944,13 +1950,99 @@ $('scSome').onclick=async()=>{
   addScanned(got);$('pdfref').classList.remove('open');
 };
 $('scPages').onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')$('scSome').click();};
+/* ---- reading a few bars again, each on its own ----
+   The bar is cut out of the printed page (with the clefs and key signature from the start of its line in front of it),
+   drawn larger, and read by itself. What comes out replaces the bar in every part. */
+let rsUndoData=null;const rsCache=new Map();
+const barStarts=its=>{const o=[];(its||[]).forEach((it,i)=>{if(it.bar!=null)o.push(i);});return o;};
+function barNoOf(i){if(!part().pb)return 0;let n=0;for(let j=0;j<=i&&j<sc.items.length;j++)if(sc.items[j].bar!=null)n++;return n;}
+async function rescanOne(k){
+  const P0=sc.parts[0],S0=barStarts(P0.items),f=P0.items[S0[k]],id=/^(\d+)\.(\d+)$/.exec(String(f.bar));if(!id)return -1;
+  const pg=+id[1],sys=+id[2],sp=scan.pages[pg]||await readScanPage(pg);if(!sp)return -1;
+  const page=sp.page,grp=page.staves.filter(x=>x.sys===sys);if(!grp.length)return -1;
+  const p=grp[0].p,nx=P0.items[S0[k+1]],right=Math.max(...grp.map(x=>x.right)),left=Math.min(...grp.map(x=>x.left));
+  const x0=(f.bx||0)*p,x1=nx&&nx.bar===f.bar&&nx.bx>(f.bx||0)?nx.bx*p:right;
+  const gi=page.staves.indexOf(grp[0]),prev=page.staves[gi-1],next=page.staves[gi+grp.length],last=grp[grp.length-1],PH=page.H||1e9;
+  const yT=Math.max(0,grp[0].top-7*p,prev?(prev.bot+grp[0].top)/2:0),yB=Math.min(PH,last.bot+7*p,next?(last.bot+next.top)/2:PH);
+  // Read at the size the page was read at. If the bar does not add up, try a little larger and a little smaller.
+  let pick=null,best=-1e9;
+  for(const Fz of [1,1.2,0.88]){const r=await readAt(Fz);if(!r)continue;
+    let sc0=r.res.bad?-1000:0;r.res.parts.forEach(q=>[q.items,q.v2||[]].forEach(l=>l.forEach(x=>{if(x.m!=null)sc0+=1+(x.ch?x.ch.length:0);})));
+    if(sc0>best){best=sc0;pick=r;}}
+  if(!pick)return -1;
+  const {np,res}=pick;
+  async function readAt(Fz){
+  const ck=pg+':'+Fz;let c=rsCache.get(ck);if(!c){c=await renderScan(pg,Math.round(page.W*Fz));rsCache.set(ck,c);}
+  const hx=Math.min(...grp.map(x=>x.musicStart))-0.25*p,L0=Math.max(0,left-3*p),xe=Math.min(page.W,x1+0.5*p);
+  const segs=x0>0?[[L0,hx],[x0+0.3*p,xe]]:[[L0,xe]],gap=x0>0?Math.round(1.5*p*Fz):0,pad=40,sh=Math.min(c.height-Math.round(yT*Fz),Math.round((yB-yT)*Fz));
+  const w=segs.reduce((a,q)=>a+Math.round((q[1]-q[0])*Fz),0)+gap+2*pad,h=sh+2*pad;
+  const o=document.createElement('canvas');o.width=w;o.height=h;const g=o.getContext('2d',{willReadFrequently:true});g.fillStyle='#fff';g.fillRect(0,0,w,h);
+  let dx=pad;
+  segs.forEach((q,si)=>{const sw=Math.round((q[1]-q[0])*Fz);g.drawImage(c,Math.round(q[0]*Fz),Math.round(yT*Fz),sw,sh,dx,pad,sw,sh);dx+=sw;
+    if(si===0&&gap){   // the staff lines carry on across the join: the emptiest column at the end of the first piece, drawn wide
+      const cw=Math.max(2,Math.round(0.6*p*Fz)),d=g.getImageData(dx-cw,pad,cw,sh).data;let best=0,bn=1e9;
+      for(let x=0;x<cw;x++){let n=0;for(let y=0;y<sh;y++)if(d[(y*cw+x)*4]<128)n++;if(n<bn){bn=n;best=x;}}
+      const col=g.getImageData(dx-cw+best,pad,1,sh),strip=document.createElement('canvas');strip.width=1;strip.height=sh;strip.getContext('2d').putImageData(col,0,0);
+      g.imageSmoothingEnabled=false;g.drawImage(strip,0,0,1,sh,dx,pad,gap,sh);dx+=gap;}});
+  const np=omrReadPage(g.getImageData(0,0,w,h),true);np.no=0;np.texts=[];np.poly=true;rescanOne.last=o;
+  if(np.staves.length!==grp.length)return null;
+  const plan=omrPolyPlan([np]);if(plan.length!==grp.length)return null;
+  np.staves.forEach(x=>{x.forceSec=false;x.pieceNo=1;});
+  plan.forEach((pl,q)=>omrSettle([{...np,staves:np.staves.filter(x=>x.part===q)}],pl.clef||st.clef));
+  np.staves.forEach((x,j)=>{const og=grp[j];x.keyFinal=og.keyFinal!=null?og.keyFinal:og.fifths;x.pieceTs=og.pieceTs||null;let ct=og.clefType;(og.clefCh||[]).forEach(cc=>{if(cc.x<x0+0.3*p)ct=cc.t;});if(ct)x.clefType=ct;});
+  const res=omrPolyItems([np],plan,st.clef,null,barTicks());
+  return {np,res};
+  }
+  const T=sc.trS||0,sum=l=>l.reduce((t,x)=>t+x.d,0),copy=l=>l.map(x=>{const y=Object.assign({},x);delete y.sec;delete y.bar;delete y.bx;if(T){if(y.m!=null)y.m+=T;if(y.ch)y.ch=y.ch.map(m=>m+T);if(y.tn)y.tn=y.tn.map(m=>m+T);}return y;});
+  const todo=[];
+  for(let j=0;j<grp.length;j++){
+    const pi=grp[j].part,P=sc.parts[pi],R=res.parts[np.staves[j].part];if(!P||!R||!R.items.length)return -1;
+    const S=barStarts(P.items),a=S[k],b=k+1<S.length?S[k+1]:P.items.length;if(a==null)return -1;
+    const old=P.items.slice(a,b),N=copy(R.items);if(Math.abs(sum(N)-sum(old))>0.02)return -1;
+    todo.push({P,a,b,old,N,V:R.v2&&R.v2.some(x=>x.m!=null)?copy(R.v2):null});
+  }
+  const sig=l=>l.filter(x=>!x.hid).map(x=>[x.m,(x.ch||[]).join('+'),x.d].join(':')).join(' ');let changed=0;
+  for(const {P,a,b,old,N,V} of todo){
+    const f0=old[0];N[0].bar=f0.bar;N[0].bx=f0.bx;if(f0.sec)N[0].sec=f0.sec;if(f0.rs)N[0].rs=true;if(old[old.length-1].re)N[N.length-1].re=true;if(f0.v!=null)N.forEach(x=>{x.v=f0.v;});
+    {let t=0;const at=new Map();N.forEach(x=>{const q=Math.round(t*12);if(!at.has(q))at.set(q,x);t+=x.d;});t=0;
+      old.forEach(x=>{const y=at.get(Math.round(t*12));t+=x.d;if(!y)return;if(x.ly&&y.m!=null&&!y.ly)y.ly=x.ly;if(x.tx&&!y.tx)y.tx=x.tx;if(x.dyn&&y.m!=null&&!y.dyn)y.dyn=x.dyn;});}
+    if(sig(N)!==sig(old))changed++;
+    P.items.splice(a,b-a,...N);
+    if(P.v2||V){
+      if(!P.v2){const S2=barStarts(P.items);P.v2=S2.map((s0,bi)=>{const e=bi+1<S2.length?S2[bi+1]:P.items.length,ff=P.items[s0];return {m:null,d:sum(P.items.slice(s0,e)),hid:true,bar:ff.bar,bx:ff.bx};});}
+      const SV=barStarts(P.v2),va=SV[k],vb=k+1<SV.length?SV[k+1]:P.v2.length;
+      if(va!=null){const NV=V||[{m:null,d:sum(N),hid:true}];NV[0].bar=f0.bar;NV[0].bx=f0.bx;if(sig(NV)!==sig(P.v2.slice(va,vb)))changed++;P.v2.splice(va,vb-va,...NV);}
+    }
+  }
+  return changed;
+}
+async function rescanBars(b0,b1){
+  if(!sc.parts.every(p=>p.pb)||!sc.parts[0].items.some(it=>/^\d+\.\d+$/.test(String(it.bar)))){stat('Only a score with a piano part or several voices, read from printed music, can be re-scanned bar by bar.');return;}
+  if(!scan.kind||(sc.scanName&&scan.name!==sc.scanName)){stat('The printed pages are not open. Press Open score, choose '+(sc.scanName||'the same file')+' again, press Close on the page view, then re-scan.');return;}
+  const nb=barStarts(sc.parts[0].items).length;b0=Math.max(1,Math.min(nb,b0|0));b1=Math.max(b0,Math.min(nb,b1|0));
+  if(b1-b0>15){stat('Re-scan up to 16 bars at a time.');return;}
+  stopPlay();
+  const before=JSON.stringify(sc.parts.map(p=>({items:p.items,v2:p.v2||null})));let ok=0,changed=0;const bad=[];
+  $('rsGo').disabled=true;
+  for(let k=b1-1;k>=b0-1;k--){
+    stat(`Reading bar ${k+1} again…`);await tick();
+    try{const r=await rescanOne(k);if(r<0)bad.push(k+1);else{ok++;changed+=r;}}catch(e){console.error(e);bad.push(k+1);}
+  }
+  $('rsGo').disabled=false;rsCache.forEach(freeCanvas);rsCache.clear();
+  if(ok){rsUndoData=before;$('rsUndo').style.display=changed?'':'none';sc.sel=-1;sc.cur=sc.items.length;sc.parts.forEach(p=>{p.hist=[];});keepScroll(drawRecording);buildParts();}
+  const span=b0===b1?'Bar '+b0:'Bars '+b0+' to '+b1;bad.sort((x,y)=>x-y);
+  stat((ok?`${span} read again from the page: ${changed?changed+(changed===1?' staff came':' staves came')+' out differently (Undo re-scan puts the old notes back)':'the same notes as before'}.`:`${span}: the re-scan did not work.`)+(bad.length?` Bar ${bad.join(', ')} did not come out as a full bar on its own and was left as it was.`:''));
+}
+$('rsGo').onclick=()=>{const a=+$('rsFrom').value,b=+$('rsTo').value||a;if(!a){stat('Click a note in the bar to re-scan, or type the bar numbers.');return;}rescanBars(Math.min(a,b),Math.max(a,b));};
+$('rsUndo').onclick=()=>{if(!rsUndoData)return;try{const d=JSON.parse(rsUndoData);d.forEach((x,i)=>{if(sc.parts[i]){sc.parts[i].items=x.items;sc.parts[i].v2=x.v2;sc.parts[i].hist=[];}});}catch(e){}rsUndoData=null;$('rsUndo').style.display='none';sc.sel=-1;sc.cur=sc.items.length;keepScroll(drawRecording);buildParts();stat('The bars are as they were before the re-scan.');};
+['rsFrom','rsTo'].forEach(id=>{$(id).onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')$('rsGo').click();};});
 async function loadFile(f){
   const n=f.name.toLowerCase();
   try{
     if(n.endsWith('.json')){
       const d=JSON.parse(await f.text());
       if(d.app!=='tenor-viol-trainer'&&d.app!=='score-converter')throw new Error('not a Score Converter file');
-      sc.tr=Math.max(-24,Math.min(24,d.tr|0));   // (the files still say tenor-viol-trainer inside, as before)
+      sc.tr=Math.max(-24,Math.min(24,d.tr|0));sc.trS=d.trS|0;sc.scanName=typeof d.src==='string'?d.src.slice(0,200):'';   // (the files still say tenor-viol-trainer inside, as before)
       let items;
       const okItem=i=>i&&typeof i.d==='number'&&(i.m==null||typeof i.m==='number');
       if(Array.isArray(d.parts)&&d.parts.length){   // a score with parts
@@ -1996,7 +2088,7 @@ $('upBtn').onclick=()=>setDur((sc.bi-1+BASES.length)%BASES.length);
 $('downBtn').onclick=()=>setDur((sc.bi+1)%BASES.length);
 $('endBtn').onclick=()=>{sc.sel=-1;sc.cur=sc.items.length;drawRecording();stat('Adding notes at the end.');};
 function clearScore(){if(rec.on)stopRec();stopPlay();
-  sc.tr=0;
+  sc.tr=0;sc.trS=0;sc.scanName='';
   if(sc.parts.length>1){sc.parts=[newPart('Part 1','treble','piano',0)];sc.pi=0;sc.neckPart=0;sc.sel=-1;sc.cur=0;buildParts();drawRecording();stat('Cleared all parts.');return;}
   snap();sc.items=[];sc.sel=-1;sc.cur=0;drawRecording();buildParts();stat('Cleared (Undo brings it back).');}
 $('clearBtn').onclick=clearScore;
@@ -2015,7 +2107,7 @@ function transposeScore(n){
   if(all.some(m=>m+n<21||m+n>108)){stat('That would take some notes off the keyboard. Choose a smaller step.');return false;}
   const mv=m=>m+n;
   sc.parts.forEach(p=>{[p.items,p.v2||[]].forEach(its=>its.forEach(it=>{if(it.m!=null)it.m=mv(it.m);if(it.ch)it.ch=it.ch.map(mv);if(it.tn)it.tn=it.tn.map(mv);delete it.sp;if(it.sec&&it.sec.k!=null)it.sec.k=trKey(it.sec.k,n);}));p.hist=[];});
-  st.key=trKey(st.key,n);$('key').value=st.key;return true;
+  st.key=trKey(st.key,n);$('key').value=st.key;sc.trS=(sc.trS||0)+n;return true;
 }
 function trShow(){const t=sc.tr||0;$('trNow').textContent=t?`The sound is ${Math.abs(t)} semitone${Math.abs(t)===1?'':'s'} ${t>0?'above':'below'} the written notes.`:'';$('trReset').style.display=t?'':'none';}
 $('trGo').onclick=()=>{
@@ -2104,7 +2196,7 @@ $('impBtn').onclick=()=>$('impFile').click();
 $('impFile').onchange=()=>{const f=$('impFile').files[0];if(f)loadFile(f);$('impFile').value='';};
 $('pdfClose').onclick=()=>{$('pdfref').classList.remove('open');};
 // the whole score, as saved in a .json file (and kept on this device)
-const scoreData=()=>({app:'score-converter',tr:sc.tr||0,version:3,title:$('title').value,key:st.key,clef:st.clef,bpm:sc.bpm,ts:sc.ts,reverb:sc.reverb,part:sc.pi,neckPart:sc.neckPart,
+const scoreData=()=>({app:'score-converter',tr:sc.tr||0,trS:sc.trS||0,src:sc.scanName||'',version:3,title:$('title').value,key:st.key,clef:st.clef,bpm:sc.bpm,ts:sc.ts,reverb:sc.reverb,part:sc.pi,neckPart:sc.neckPart,
   parts:sc.parts.map(p=>({name:p.name,clef:p.clef,mainClef:p.mainClef||null,kb:p.kb||null,pb:!!p.pb,v2:p.v2||null,sound:p.sound,viol:violOf(p),vol:p.vol,pan:p.pan,mute:p.mute,solo:p.solo,items:p.items}))});
 $('expBtn').onclick=()=>{
   if(rec.on)stopRec();
