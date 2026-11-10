@@ -90,6 +90,7 @@ span.pname{min-width:0;color:var(--dim)}
 <div id="topbar">
   <span class="appname">Score Converter</span><span id="ver"></span>
   <button id="impBtn" class="primary" title="Printed music as a PDF or a picture, or a MusicXML, MIDI or saved score file">Open score…</button>
+  <button id="pagesBtn" style="display:none" title="Look at the printed pages again, to compare them with the score or to scan more of them">Printed pages</button>
   <button id="photoBtn" title="Photos of printed music, from the camera or from your pictures. You tidy each one before it is read.">Photo…</button>
   <button id="playBtn">▶ Play</button>
   <label title="Crotchet beats in a minute">Tempo <input type="number" id="bpm" value="60" min="30" max="240" style="width:64px"></label>
@@ -189,15 +190,18 @@ span.pname{min-width:0;color:var(--dim)}
 <div id="pdfref">
   <div class="controls">
     <b>Printed music</b>
-    <button id="scPrev">‹</button><span id="scPage" class="score">Page 1 / 1</span><button id="scNext">›</button>
-    <button id="scAll" class="primary">Read all pages</button>
-    <button id="scRead">Read this page only</button>
-    <label title="For example 5-6, or 2,4-6">Pages <input type="text" id="scPages" placeholder="e.g. 5-6" style="width:86px"></label><button id="scSome">Read these pages</button>
-    <label title="Tick this if the key signature was read wrongly: choose the right key under Edit first"><input type="checkbox" id="scKey"> Use the key chosen under Edit</label>
-    <button id="pdfClose">Close</button>
+    <button id="scPrev" title="Previous page">‹</button><span id="scPage" class="score">Page 1 / 1</span><button id="scNext" title="Next page">›</button>
+    <button id="scAll" class="primary" title="Read every page and make the score from them">Scan whole score</button>
+    <button id="scRead" title="Read only the page shown here">Scan this page</button>
+    <span id="scSomeBox" class="controls"><label title="For example 5-6, or 2,4-6">Pages <input type="text" id="scPages" placeholder="e.g. 5-6" style="width:86px"></label><button id="scSome">Scan these pages</button></span>
+    <span style="flex:1"></span>
+    <button id="pdfClose" class="primary" title="Leave this page and go to the score made from it. If nothing has been scanned yet, the whole score is scanned first.">Go to scanned copy now</button>
+    <button id="scCancel" title="Leave this page without scanning anything">Cancel</button>
   </div>
+  <div id="scStep" class="hint" style="margin-top:0"></div>
   <div class="score" id="scInfo"></div>
-  <div class="score" style="font-size:12px">Marks on the page show what was read: B breve, S semibreve, M minim, C crotchet, Q quaver, q semiquaver, a dot means dotted, r is a rest, green lines are bar lines.</div>
+  <div class="controls" style="font-size:12px"><span class="score" style="font-size:12px">Marks on the page show what was read: B breve, S semibreve, M minim, C crotchet, Q quaver, q semiquaver, a dot means dotted, r is a rest, green lines are bar lines.</span>
+    <label title="Tick this if the key signature was read wrongly: choose the right key under Edit first" style="font-size:12px"><input type="checkbox" id="scKey"> Use the key chosen under Edit</label></div>
   <div id="scView"><canvas id="scCanvas" style="width:100%;display:block"></canvas></div>
 </div>
 
@@ -210,7 +214,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.5';
+const APP_VERSION='5.6';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -1801,7 +1805,7 @@ async function ensurePdfJs(){
 const tick=()=>new Promise(r=>setTimeout(r,20));
 function scanInfo(t){$('scInfo').textContent=t;}
 async function openScan(f){
-  scan.pages=[];scan.cur=0;scan.name=f.name;
+  scan.pages=[];scan.cur=0;scan.name=f.name;scan.added=false;scan.kind=f.name.toLowerCase().endsWith('.pdf')?'pdf':'img';scan.n=1;scanStep();
   $('pdfref').classList.add('open');scanInfo('Opening '+f.name+'…');await tick();
   if(f.name.toLowerCase().endsWith('.pdf')){
     await ensurePdfJs();
@@ -1811,7 +1815,7 @@ async function openScan(f){
     const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('this picture type cannot be opened'));i.src=url;});
     scan.kind='img';scan.imgs=[img];scan.n=1;
   }
-  stat('Opened '+f.name+'. Check the marked notes on the page, then add them to the score.');
+  scanStep();stat('Opened '+f.name+'. Press Scan whole score to make the score from it.');
   await showScanPage(0);
 }
 // (pages are drawn in memory, not on the graphics card: thin lines come out the same on every device)
@@ -1901,6 +1905,7 @@ function scanParts(pages){
   return clefs;
 }
 function addScanned(list){
+  scan.added=true;scanStep();
   const override=$('scKey').checked?st.key:null;
   const all=scan.pages.map(p=>p&&p.page),pages=list.map(sp=>sp.page);
   if(pages.some(pg=>pg.poly)){addScannedPoly(all,pages,override);return;}   // a piano part, chords or two voices on a staff
@@ -2017,7 +2022,9 @@ $('scRead').onclick=async()=>{await showScanPage(scan.cur);if(scan.pages[scan.cu
 $('scAll').onclick=async()=>{
   for(let i=0;i<scan.n;i++){if(!scan.pages[i]){scanInfo(`Reading page ${i+1} of ${scan.n}…`);await tick();try{await readScanPage(i);}catch(err){console.error(err);}}}
   await drawScanPage(scan.cur);scanInfo(pageSummary(scan.pages[scan.cur]));
-  addScanned(scan.pages.filter(Boolean));
+  const got=scan.pages.filter(Boolean);
+  if(!got.length){scanInfo('No page of this file could be read.');return;}
+  addScanned(got);
   $('pdfref').classList.remove('open');
 };
 // "5-6", "2, 4-6": the pages to read (counted from 1)
@@ -2257,9 +2264,9 @@ async function openPhotos(files){
   const out=[];
   for(let i=0;i<files.length;i++){const img=await loadImg(files[i]),c=await tidyPhoto(img,i,files.length);if(!c)break;out.push(c);}
   if(!out.length){stat('No photo was taken in.');return;}
-  scan.pages=[];scan.cur=0;scan.name=files[0].name;scan.kind='img';scan.pdf=null;scan.imgs=out;scan.n=out.length;
+  scan.pages=[];scan.cur=0;scan.name=files[0].name;scan.kind='img';scan.pdf=null;scan.imgs=out;scan.n=out.length;scan.added=false;scanStep();
   $('pdfref').classList.add('open');scanInfo('Reading the photo…');await tick();
-  stat(`${out.length} photo${out.length>1?'s':''} tidied. Check the marked notes on the page, then read ${out.length>1?'them':'it'} into the score.`);
+  stat(`${out.length} photo${out.length>1?'s':''} tidied. Press Scan ${out.length>1?'whole score':'this score'} to make the score.`);
   await showScanPage(0);
 }
 async function loadFile(f){
@@ -2462,7 +2469,18 @@ const openFiles=fs=>{fs=[...fs];if(!fs.length)return;if(fs.length>1&&fs.every(is
 $('impFile').onchange=()=>{openFiles($('impFile').files);$('impFile').value='';};
 $('photoBtn').onclick=()=>$('photoFile').click();
 $('photoFile').onchange=()=>{const fs=[...$('photoFile').files].filter(isPic);$('photoFile').value='';if(fs.length)openPhotos(fs).catch(e=>stat('Import failed: '+e.message));};
-$('pdfClose').onclick=()=>{$('pdfref').classList.remove('open');};
+// Leaving the page of printed music. "Go to scanned copy now" always ends in a score: when nothing from this file has
+// been scanned yet, the whole score is scanned first.
+function scanStep(){
+  const n=scan.n||1;$('scSomeBox').style.display=$('scRead').style.display=n>1?'':'none';
+  $('scAll').textContent=n>1?'Scan whole score':'Scan this score';
+  $('scStep').textContent=scan.added?'This file is in your score. You can scan more pages, or go back to the score.'
+    :'This is the printed page, with marks showing what can be read. Nothing is in your score yet: press '+(n>1?'Scan whole score, Scan this page, or choose pages.':'Scan this score.');
+  $('pagesBtn').style.display=scan.kind?'':'none';
+}
+$('pdfClose').onclick=()=>{if(!scan.added&&scan.kind){$('scAll').click();return;}$('pdfref').classList.remove('open');stat(scan.added?'This is the scanned copy. Printed pages (top left) shows the print again.':'');};
+$('scCancel').onclick=()=>{$('pdfref').classList.remove('open');if(!scan.added)stat('Nothing was scanned. Printed pages (top left) opens the print again.');};
+$('pagesBtn').onclick=async()=>{if(!scan.kind)return;stopPlay();$('pdfref').classList.add('open');scanStep();await showScanPage(scan.cur);};
 // the whole score, as saved in a .json file (and kept on this device)
 const scoreData=()=>({app:'score-converter',bm:(sc.bm||[]).slice(),tr:sc.tr||0,trS:sc.trS||0,src:sc.scanName||'',version:3,title:$('title').value,key:st.key,clef:st.clef,bpm:sc.bpm,ts:sc.ts,reverb:sc.reverb,part:sc.pi,neckPart:sc.neckPart,
   parts:sc.parts.map(p=>({name:p.name,clef:p.clef,mainClef:p.mainClef||null,kb:p.kb||null,pb:!!p.pb,v2:p.v2||null,sound:p.sound,viol:violOf(p),vol:p.vol,pan:p.pan,mute:p.mute,solo:p.solo,items:p.items}))});
