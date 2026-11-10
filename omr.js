@@ -1069,7 +1069,10 @@ function omrReadPage(imgData, again) {
     if (nextS && dnGap > 0) { let n = 0; for (const b of bars) { const x = Math.round((b.x0 + b.x1) / 2); let c = 0; for (let y = spanBot + 1; y <= spanBot + dnGap; y++) if (bin[y * W + x] || bin[y * W + x - 1] || bin[y * W + x + 1]) c++; if (c >= 0.97 * dnGap) n++; } linkDn = bars.length ? n / bars.length : 0; }
     // repeat signs: two dots in the middle spaces, before the bar line (end of a repeat) or after it (start of one)
     const repDot = (cx, cy) => discFill(cx, cy, 0.16 * p) >= 0.75 && !dark(Math.round(cx), Math.round(cy - 0.38 * p)) && !dark(Math.round(cx), Math.round(cy + 0.38 * p));
-    const dots = x => repDot(x, st.top + 1.5 * p) && repDot(x, st.top + 2.5 * p);
+    // (a repeat dot is small and round: the crossbars of a sharp standing on the middle line are in the same two places,
+    //  but they are long)
+    const shortRun = (cx, cy) => { const y = Math.round(cy); let a = Math.round(cx), b = a; while (cx - a < p && dark(a - 1, y)) a--; while (b - cx < p && dark(b + 1, y)) b++; return b - a + 1 <= 0.62 * p; };
+    const dots = x => repDot(x, st.top + 1.5 * p) && repDot(x, st.top + 2.5 * p) && (!again || (shortRun(x, st.top + 1.5 * p) && shortRun(x, st.top + 2.5 * p)));
     for (const b of bars) {
       for (let dx = 0.25; dx <= 1.0 && !b.end; dx += 0.06) if (dots(b.x0 - dx * p)) b.end = true;
       for (let dx = 0.25; dx <= 1.0 && !b.start; dx += 0.06) if (dots(b.x1 + dx * p)) b.start = true;
@@ -1231,7 +1234,8 @@ function omrReadPage(imgData, again) {
     // number under it. (A beam is thick, and a slur has no straight hook.)
     const voltas = [];
     if (posOf[si] === 0) {
-      const ya = Math.max(0, Math.round(st.top - 4.5 * p)), yb = Math.round(st.top - 0.9 * p), found = [];
+      const prevSt = si > 0 ? SV[si - 1] : null;
+      const ya = Math.max(0, Math.round(again ? Math.max(st.top - 9 * p, prevSt ? prevSt.bot + 1.5 * p : 0) : st.top - 4.5 * p)), yb = Math.round(st.top - 0.9 * p), found = [];
       for (let y = ya; y <= yb; y++) {
         let s = -1;
         for (let x = Math.max(0, Math.round(st.left)); x <= Math.min(W - 1, Math.round(st.right)) + 1; x++) {
@@ -1250,7 +1254,14 @@ function omrReadPage(imgData, again) {
       }
       found.sort((a, b) => a.x0 - b.x0).forEach(f => {
         // (the number can sit a few spaces in from the hook)
-        const n = omrReadNumber(bin, W, H, Math.round(f.x0 + 0.3 * p), Math.round(Math.min(f.x1 - 0.2 * p, f.x0 + 5 * p)), Math.round(f.y + 0.2 * p), Math.round(Math.min(f.y + 2.2 * p, st.top - 0.5 * p)));
+        let n = null;
+        if (again) {   // the first sign after the hook, by itself: its columns up to the first gap
+          const xa = Math.round(f.x0 + 0.25 * p), xb = Math.round(Math.min(f.x1 - 0.2 * p, f.x0 + 5 * p)), y0 = Math.round(f.y + 0.2 * p), y1 = Math.round(Math.min(f.y + 2.4 * p, st.top - 0.5 * p));
+          const ink = x => { for (let y = y0; y <= y1; y++) if (bin[y * W + x]) return true; return false; };
+          let a = -1, b = -1; for (let x = xa; x <= xb; x++) { if (ink(x)) { if (a < 0) a = x; b = x; } else if (a >= 0) break; }
+          if (a >= 0 && b - a >= 0.15 * p) n = omrReadNumber(bin, W, H, a, b, y0, y1, [1, 2, 3, 4]);
+        }
+        if (!n) n = omrReadNumber(bin, W, H, Math.round(f.x0 + 0.3 * p), Math.round(Math.min(f.x1 - 0.2 * p, f.x0 + 5 * p)), Math.round(f.y + 0.2 * p), Math.round(Math.min(f.y + 2.2 * p, st.top - 0.5 * p)));
         if (n && n <= 4) voltas.push({ n, x0: f.x0, x1: f.x1, y: f.y });            // no number, no ending
       });
     }
