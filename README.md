@@ -7,7 +7,10 @@ Open it here: https://deepspace000.github.io/score-converter/
 ## What it does
 
 - **Open a score**: a PDF or a picture of printed music, or a MusicXML, MIDI or saved score file. Press **Open score** or drop the file on the page. Read every page, one page, or chosen pages (for example 5-6).
+- **Photos**: press **Photo** to take in photos of printed music (from the camera or your pictures). Each one opens on a tidy-up page first: turn it, drag the four corners onto the corners of the music so the staves run straight, and even out the light. A PDF still reads more accurately than a photo.
 - **Play it**: every part together, with mute, solo, volume, pan and sound for each part. Start from any bar. The score follows the music.
+- **Loop and count-in**: press **Loop**, type the bars, and Play goes round them with a bar of clicks before each time. The count-in also works without the loop.
+- **Bookmarks**: press **+ Bookmark** (or M) while the music plays to mark the bar; press the bookmark above the score to play from there again. Bookmarks are saved with the score.
 - **Change the tempo**: the Tempo box (a printed metronome mark sets it when the score is read).
 - **Change the notes**: drag a note up or down on the staff, or click it and use the arrow keys or the buttons under **Edit** to change its pitch or rhythm, delete it, or add notes and rests. Key, time signature and title can be changed too.
 - **Re-scan bars**: if some bars came out wrong, type their numbers under **Edit** (or click a note in the bar) and press **Re-scan from the page**. The bar is cut out of the printed page and read again. Each further press reads it a different way (on its own, larger, smaller, with the bars either side, each staff by itself, with the print made heavier or lighter) and shows the next reading you have not seen yet. **Undo re-scan** goes back one press at a time.
@@ -28,5 +31,6 @@ The reader handles scores with several staves, piano parts with chords and two v
 | . | Dot |
 | A to G | Add a note |
 | R | Add a rest |
+| M | Bookmark the bar that is playing |
 | Delete | Delete the selected note |
 | Ctrl+Z | Undo |

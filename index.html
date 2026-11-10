@@ -54,6 +54,22 @@ span.pname{min-width:0;color:var(--dim)}
 .prow input[type=range]{width:110px}
 .grp{display:inline-flex;gap:4px;flex-wrap:wrap}
 .pal .gl{font-size:19px;line-height:1;font-family:'Segoe UI Symbol','Noto Music',serif}
+/* bookmarks: a row of places to come back to */
+#bmBar{flex:none;display:none;flex-wrap:wrap;gap:6px 8px;align-items:center;padding:6px 14px 0}
+#bmBar.has{display:flex}
+#bmBar .bm{display:inline-flex}
+#bmBar .bm .go{border-radius:6px 0 0 6px;border-right:0;background:#fef3c7;border-color:#f59e0b}
+#bmBar .bm .go:hover{background:#fde68a}
+#bmBar .bm .x{border-radius:0 6px 6px 0;padding:6px 8px;border-color:#f59e0b;color:#92400e}
+/* tidying a photo before it is read */
+#tidy{position:fixed;inset:10px;z-index:35;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 40px rgba(15,23,42,.35);padding:12px;display:none;flex-direction:column;gap:8px}
+#tidy.open{display:flex}
+#tidy b{font-size:16px}
+#tdBody{flex:1;min-height:0;display:flex;gap:10px}
+#tdBody>div{flex:1;min-width:0;min-height:0;display:flex;align-items:center;justify-content:center;background:#e2e8f0;border-radius:6px;overflow:hidden}
+#tdSrc{touch-action:none;cursor:grab}
+#tdOut{max-width:100%;max-height:100%;background:#fff}
+@media (max-width:760px){#tdBody{flex-direction:column}}
 /* reading printed music: a sheet over everything else */
 #pdfref{position:fixed;inset:10px;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 40px rgba(15,23,42,.35);padding:12px;display:none;flex-direction:column;gap:6px}
 #pdfref.open{display:flex}
@@ -74,11 +90,16 @@ span.pname{min-width:0;color:var(--dim)}
 <div id="topbar">
   <span class="appname">Score Converter</span><span id="ver"></span>
   <button id="impBtn" class="primary" title="Printed music as a PDF or a picture, or a MusicXML, MIDI or saved score file">Open score…</button>
+  <button id="photoBtn" title="Photos of printed music, from the camera or from your pictures. You tidy each one before it is read.">Photo…</button>
   <button id="playBtn">▶ Play</button>
   <label title="Crotchet beats in a minute">Tempo <input type="number" id="bpm" value="60" min="30" max="240" style="width:64px"></label>
   <label>From <select id="fromSel" style="max-width:200px"></select></label>
   <label>Bar <input type="number" id="fromBar" min="1" placeholder="–" style="width:58px"></label>
   <button id="followBtn" class="on" title="Keep the music that is playing in view (scrolling by hand pauses it)">Follow</button>
+  <button id="bmBtn" title="Mark the bar that is playing now (or the bar of the selected note), to come back to it later. Key: M">+ Bookmark</button>
+  <button id="lpBtn" title="Play the bars chosen here round and round, for practising">Loop</button>
+  <label title="The bars to play round and round">bars <input type="number" id="lpFrom" min="1" placeholder="–" style="width:56px"> to <input type="number" id="lpTo" min="1" placeholder="–" style="width:56px"></label>
+  <label title="Clicks before the music starts, and before each time round a loop">Count-in <select id="cntSel"><option value="0">none</option><option value="1">1 bar</option><option value="2">2 bars</option></select></label>
   <label id="partPick" style="display:none">Part <select id="partSel"></select></label>
   <button id="fullBtn" style="display:none" title="Show every part's staff together, or only the part you are working on">All parts</button>
   <span style="flex:1"></span>
@@ -86,7 +107,8 @@ span.pname{min-width:0;color:var(--dim)}
   <button class="fold" data-p="pParts" title="Mute, solo, volume, pan and sound of each part">Parts ▾</button>
   <button class="fold" data-p="pFile" title="Save the score, or export it as MIDI, MusicXML or PDF">Save ▾</button>
   <button id="wipeBtn" title="Delete everything in the score (asks first)">Clear</button>
-  <input type="file" id="impFile" accept=".json,.mid,.midi,.musicxml,.xml,.pdf,image/*" style="display:none">
+  <input type="file" id="impFile" accept=".json,.mid,.midi,.musicxml,.xml,.pdf,image/*" multiple style="display:none">
+  <input type="file" id="photoFile" accept="image/*" multiple style="display:none">
 </div>
 
 <div class="foldp pal" id="pNotes">
@@ -145,8 +167,24 @@ span.pname{min-width:0;color:var(--dim)}
   <div class="hint">The score is also kept on this device, so it is still here when you come back.</div>
 </div>
 
+<div id="bmBar"></div>
 <div id="statusLine"><span class="score" id="recstat"></span></div>
 <div id="scoreBox"><h2 id="rectitle"></h2><div id="recscore"></div></div>
+
+<div id="tidy">
+  <div class="controls">
+    <b>Tidy up the photo</b><span id="tdCount" class="score"></span>
+    <button id="tdL" title="Turn the photo a quarter turn to the left">⟲ Turn</button><button id="tdR" title="Turn the photo a quarter turn to the right">Turn ⟳</button>
+    <button id="tdReset" title="Put the four corners back on the corners of the photo">Corners to the edges</button>
+    <label title="Takes out shadows and uneven light and makes the page black on white"><input type="checkbox" id="tdClean" checked> Even out the light</label>
+    <label title="To the right: thin and faint print comes out stronger">Lighter <input type="range" id="tdDark" min="0" max="100" value="50" style="width:120px"> Darker</label>
+    <span style="flex:1"></span>
+    <button id="tdOk" class="primary">Use this picture</button>
+    <button id="tdCancel">Cancel</button>
+  </div>
+  <div class="hint">Drag the four white dots onto the corners of the music, so that the staves run straight across. The picture on the right is what will be read.</div>
+  <div id="tdBody"><div id="tdLeft"><canvas id="tdSrc"></canvas></div><div id="tdRight"><canvas id="tdOut"></canvas></div></div>
+</div>
 
 <div id="pdfref">
   <div class="controls">
@@ -172,7 +210,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.4';
+const APP_VERSION='5.5';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -771,7 +809,7 @@ function guessViol(name,clef,sound){
   return sound==='violin'?'treble':sound==='cello'?'bass':'tenor';
 }
 const violOf=p=>p&&VIOLS[p.viol]?p.viol:'tenor';
-const sc={ts:[4,4],bpm:60,sel:-1,cur:0,bi:3,dots:0,parts:[newPart('Part 1','treble','piano',0)],pi:0,reverb:0.3,full:false,neckPart:0,tr:0};   // tr: semitones the sound is above the written notes   // neckPart: the part the neck shows while playing (-1: every part)
+const sc={ts:[4,4],bpm:60,sel:-1,cur:0,bi:3,dots:0,parts:[newPart('Part 1','treble','piano',0)],pi:0,reverb:0.3,full:false,neckPart:0,tr:0,bm:[]};   // tr: semitones the sound is above the written notes   // neckPart: the part the neck shows while playing (-1: every part)
 try{sc.full=localStorage.getItem('score-conv-full')==='1';}catch(e){}   // all the parts' staves together (remembered)
 Object.defineProperty(sc,'items',{get(){return sc.parts[sc.pi].items;},set(v){sc.parts[sc.pi].items=v;}});
 Object.defineProperty(sc,'hist',{get(){return sc.parts[sc.pi].hist;},set(v){sc.parts[sc.pi].hist=v;}});
@@ -799,7 +837,7 @@ function buildParts(){
   rv.innerHTML=`<span class="pname">Room</span><label>Reverb <input type="range" min="0" max="1" step="0.01" value="${sc.reverb}"></label>`;
   rv.querySelector('input').oninput=e=>setReverb(+e.target.value);
   B.append(rv);
-  buildPartPick();
+  buildPartPick();bmShow();
   const M=$('midParts');M.innerHTML='';
   sc.parts.forEach(p=>{const l=document.createElement('label'),c=document.createElement('input');c.type='checkbox';c.checked=p.inMidi!==false;c.onchange=()=>{p.inMidi=c.checked;};l.append(c,' '+p.name);M.append(l);});
   trShow();
@@ -1544,26 +1582,51 @@ function stopPlay(){
   for(const k in playing.lit)markNote(+k,playing.lit[k],false);
   playing=null;$('playBtn').textContent='▶ Play';st.hl={};st.pulse={};drawNecks();followUI();adviceStop();
 }
+// Loop: the bars from ... to ... of the piece chosen under From, played round and round.
+const lp={on:false};
+function loopRange(){
+  if(!lp.on)return null;
+  const T=partTimes(leadPart())[sc.pi],at=i=>T[i]!=null?T[i]:0,map=barMap();if(!map.length)return null;
+  const v=$('fromSel').value,chosen=(v==='start'?map[0]:map[+v])||map[0],mine=map.filter(x=>x.piece===chosen.piece);
+  let a=parseInt($('lpFrom').value,10),b=parseInt($('lpTo').value,10);
+  if(!(a>0))a=sc.sel>=0?(map.filter(x=>x.idx<=sc.sel).pop()||map[0]).bar:1;
+  if(!(b>=a))b=a;
+  const A=mine.find(x=>x.bar===a)||mine[0],B=mine.find(x=>x.bar===b)||mine[mine.length-1],nx=map[map.indexOf(B)+1];
+  const end=sc.items.length?at(sc.items.length-1)+sc.items[sc.items.length-1].d:0,t0=at(A.idx),t1=nx?at(nx.idx):end;
+  return t1>t0?{t0,t1,a:A.bar,b:B.bar}:null;
+}
+// the beats of a bar for the count-in (in 6/8, 9/8 and 12/8 the beat is a dotted crotchet)
+function countBeats(){const n=sc.ts[0],d=sc.ts[1];return d===8&&n%3===0&&n>3?{n:n/3,len:24}:{n,len:64/d};}
+function clickAt(t,strong,dest){const c=ac,o=c.createOscillator(),g=c.createGain();o.type='square';o.frequency.value=strong?1760:1175;
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(strong?0.5:0.3,t+0.002);g.gain.exponentialRampToValueAtTime(0.0001,t+0.07);o.connect(g).connect(dest);o.start(t);o.stop(t+0.09);}
 function playScore(){
   if(playing){stopPlay();return;}
   if(!sc.parts.some(p=>p.items.length)){stat('Nothing to play yet.');return;}
   const master=audioOut(),c=ac,out=c.createGain();out.connect(master);
   const buses=sc.parts.map(p=>{const g=c.createGain(),pan=c.createStereoPanner();g.gain.value=audible(p)?p.vol:0;pan.pan.value=p.pan;g.connect(pan).connect(out);return {g,pan};});
-  const from=startTick();
+  const go=sc.bmGo;sc.bmGo=null;
+  const L=go!=null?null:loopRange(),from=L?L.t0:go!=null?go:startTick();
   const tl=buildTimeline(from),per=60/sc.bpm/TPQ,t0=c.currentTime+0.15;
+  if(L){const len=L.t1-L.t0;tl.ev=tl.ev.filter(e=>e.at<len-0.01);tl.ev.forEach(e=>{if(e.at+e.d>len)e.d=len-e.at;});tl.total=len;}
+  const cb=+$('cntSel').value||0,CB=countBeats(),cT=cb*CB.n*CB.len;
+  if(cT){tl.ev.forEach(e=>{e.at+=cT;});const cl=[];for(let i=0;i<cb*CB.n;i++)cl.push({click:i%CB.n===0?2:1,at:i*CB.len,x:true});tl.ev=cl.concat(tl.ev);tl.total+=cT;}
   adviceStart();
-  playing={ev:tl.ev,k:0,t0,out,buses,timers:[],lit:{},follow:st.follow,now:sc.parts.map(()=>null),beat:sc.parts.map(()=>0)};
+  playing={ev:tl.ev,k:0,t0,out,buses,timers:[],lit:{},follow:st.follow,now:sc.parts.map(()=>null),beat:sc.parts.map(()=>0),round:!!L&&tl.total>0,total:tl.total};
   // notes are set up a little ahead of time, a few at a time, so a long piece starts at once (and the iPad copes)
   const pump=()=>{const p=playing;if(!p)return;const now=ac.currentTime;
-    while(p.k<p.ev.length&&p.t0+p.ev[p.k].at*per<now+1.2){
+    for(;;){
+      if(p.k>=p.ev.length){if(p.round&&p.ev.length){p.t0+=p.total*per;p.k=0;}else break;}   // (a loop starts again, count-in and all)
+      if(!(p.t0+p.ev[p.k].at*per<now+1.2))break;
       const e=p.ev[p.k++],at=p.t0+e.at*per;
+      if(e.click){clickAt(at,e.click===2,p.out);continue;}
       if(e.m!=null&&!e.q)voice(e.m+(sc.tr||0),at,e.d*per*(e.st?0.5:0.97),sc.parts[e.pi].sound,p.buses[e.pi].g,e.v);
       if(!e.x)p.timers.push(setTimeout(()=>{if(playing!==p)return;p.now[e.pi]=e.m;if(e.m!=null)p.beat[e.pi]++;lightPlaying(e.pi,e.i);paintPlaySoon();},Math.max(0,(at-ac.currentTime)*1000)));
     }};
   pump();playing.loop=setInterval(pump,250);
-  playing.timers.push(setTimeout(stopPlay,(t0+tl.total*per-c.currentTime)*1000+500));
+  if(!playing.round)playing.timers.push(setTimeout(stopPlay,(t0+tl.total*per-c.currentTime)*1000+500));
   $('playBtn').textContent='■ Stop';followUI();
   const n=sc.parts.filter(audible).length;
+  if(L){stat(`Looping bar${L.a===L.b?' '+L.a:'s '+L.a+' to '+L.b}${cb?', with '+cb+' bar'+(cb>1?'s':'')+' of clicks before each time round':''}. Press Stop to end.`);return;}
   stat((sc.sel>=0?'Playing from note '+(sc.sel+1)+'. ':'')+(sc.parts.length>1?`${n} of ${sc.parts.length} parts sounding. `:'')+(sc.sel>=0?'Deselect the note (click it again) to play from the start.':''));
 }
 
@@ -1751,16 +1814,17 @@ async function openScan(f){
   stat('Opened '+f.name+'. Check the marked notes on the page, then add them to the score.');
   await showScanPage(0);
 }
+// (pages are drawn in memory, not on the graphics card: thin lines come out the same on every device)
 async function renderScan(i,targetW){
   let c=document.createElement('canvas');
   if(scan.kind==='pdf'){
     const pg=await scan.pdf.getPage(i+1),v1=pg.getViewport({scale:1}),v=pg.getViewport({scale:targetW/v1.width});
     c.width=Math.round(v.width);c.height=Math.round(v.height);
-    const x=c.getContext('2d',{willReadFrequently:true});   // (drawn in memory, not on the graphics card: thin lines come out the same on every device)x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
+    const x=c.getContext('2d',{willReadFrequently:true});x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
     await pg.render({canvasContext:x,viewport:v,intent:'print'}).promise;   // 'print' does not wait for screen refreshes, so hidden tabs work too
   }else{
     const img=scan.imgs[i];c.width=targetW;c.height=Math.round(targetW*img.height/img.width);
-    const x=c.getContext('2d',{willReadFrequently:true});   // (drawn in memory, not on the graphics card: thin lines come out the same on every device)x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.imageSmoothingQuality='high';x.drawImage(img,0,0,c.width,c.height);
+    const x=c.getContext('2d',{willReadFrequently:true});x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.imageSmoothingQuality='high';x.drawImage(img,0,0,c.width,c.height);
   }
   // scans are often a little crooked: straighten the staff lines first
   const sk=estimateSkew(c.getContext('2d',{willReadFrequently:true}).getImageData(0,0,c.width,c.height));
@@ -1911,7 +1975,7 @@ function addScannedPoly(all,pages,override){
   else made.forEach((m,i)=>{const p=sc.parts[i]||(sc.parts[i]=newPart(m.name,m.clef,m.sound,m.pan));p.hist.push(JSON.stringify(p.items));p.items=p.items.concat(m.items);});
   sc.pi=0;sc.sel=-1;sc.cur=sc.items.length;
   if(fresh){
-    sc.neckPart=0;sc.scanName=scan.name;sc.trS=0;sc.tr=0;
+    sc.neckPart=0;sc.scanName=scan.name;sc.trS=0;sc.tr=0;sc.bm=[];
     {const mk=made.flatMap(m=>m.items).find(x=>x.tx&&/=\s*\d+/.test(x.tx)),n=mk?+/=\s*(\d+)/.exec(mk.tx)[1]:0;if(n>=30&&n<=240){sc.bpm=n;$('bpm').value=n;}}
     const f=pages.flatMap(pg=>pg.staves).find(s=>s.pe&&s.pe.length);
     const k=f?(f.keyFinal!=null?f.keyFinal:f.fifths):null;
@@ -2117,13 +2181,94 @@ $('rsGo').onclick=()=>{const a=+$('rsFrom').value,b=+$('rsTo').value||a;if(!a){s
 $('rsUndo').onclick=()=>{if(!rsUndo.length)return;try{const d=JSON.parse(rsUndo.pop());d.forEach((x,i)=>{if(sc.parts[i]){sc.parts[i].items=x.items;sc.parts[i].v2=x.v2;sc.parts[i].hist=[];}});}catch(e){}
   $('rsUndo').style.display=rsUndo.length?'':'none';sc.sel=-1;sc.cur=sc.items.length;keepScroll(drawRecording);buildParts();stat('Back to the notes before that re-scan.'+(rsUndo.length?' Undo re-scan again goes back one more.':''));};
 ['rsFrom','rsTo'].forEach(id=>{$(id).onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')$('rsGo').click();};});
+/* ---- photos of printed music ----
+   A photo is tidied before it is read: turned the right way up, the four corners of the music pulled out to a
+   rectangle (which also straightens the staves), and the light evened out so that the page is black on white. */
+const td={src:null,q:0,work:null,gray:null,pts:null,drag:-1,resolve:null,t:0};
+const loadImg=f=>new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('this kind of picture cannot be opened here (try a JPEG or PNG)'));i.src=URL.createObjectURL(f);});
+function tdSetWork(){   // the photo, turned, no larger than is useful
+  const src=td.src,k=Math.min(1,(TOUCH?3200:4200)/Math.max(src.width,src.height)),w=Math.round(src.width*k),h=Math.round(src.height*k),odd=td.q%2===1,c=document.createElement('canvas');
+  c.width=odd?h:w;c.height=odd?w:h;const g=c.getContext('2d',{willReadFrequently:true});g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);
+  g.translate(c.width/2,c.height/2);g.rotate(td.q*Math.PI/2);g.drawImage(src,-w/2,-h/2,w,h);
+  td.work=c;td.gray=null;td.pts=[[0,0],[1,0],[1,1],[0,1]];
+}
+// shadows and uneven light: the paper's own brightness is found block by block and divided out
+function tdClean(a,w,h,dark){
+  const B=Math.max(16,Math.round(w/40)),bw=Math.ceil(w/B),bh=Math.ceil(h/B),bg=new Float32Array(bw*bh),hist=new Uint32Array(256);
+  for(let by=0;by<bh;by++)for(let bx=0;bx<bw;bx++){hist.fill(0);let n=0;
+    for(let y=by*B;y<Math.min(h,by*B+B);y+=2)for(let x=bx*B;x<Math.min(w,bx*B+B);x+=2){hist[a[y*w+x]]++;n++;}
+    let k=255,acc=0;while(k>0&&(acc+=hist[k])<n*0.15)k--;bg[by*bw+bx]=Math.max(40,k);}   // (ink never fills a block: its lighter part is paper)
+  const sm=new Float32Array(bw*bh);
+  for(let y=0;y<bh;y++)for(let x=0;x<bw;x++){let t=0,n=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=bw||yy>=bh)continue;t+=bg[yy*bw+xx];n++;}sm[y*bw+x]=t/n;}
+  // (only the light is evened out; the greys of thin lines stay, or bar lines and braces would break up. The slider
+  //  makes the greys darker or lighter.)
+  const gam=dark>=50?1+(dark-50)/25:1/(1+(50-dark)/25),lut=new Uint8Array(256);for(let i=0;i<256;i++)lut[i]=Math.round(255*Math.pow(i/255,gam));
+  for(let y=0;y<h;y++){const gy=Math.min(bh-1,Math.max(0,(y+0.5)/B-0.5)),y0=gy|0,y1=Math.min(bh-1,y0+1),fy=gy-y0;
+    for(let x=0;x<w;x++){const gx=Math.min(bw-1,Math.max(0,(x+0.5)/B-0.5)),x0=gx|0,x1=Math.min(bw-1,x0+1),fx=gx-x0;
+      const b=(sm[y0*bw+x0]*(1-fx)+sm[y0*bw+x1]*fx)*(1-fy)+(sm[y1*bw+x0]*(1-fx)+sm[y1*bw+x1]*fx)*fy,v=a[y*w+x]/(0.94*b);
+      a[y*w+x]=lut[v>=1?255:(v*255)|0];}}
+}
+// the tidied picture: what lies between the four corners, pulled out to a rectangle
+function tdRender(maxW){
+  const W=td.work.width,H=td.work.height;
+  if(!td.gray){const d=td.work.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data,g=new Uint8Array(W*H);for(let i=0;i<W*H;i++)g[i]=(d[i*4]*3+d[i*4+1]*6+d[i*4+2])/10;td.gray=g;}
+  const G=td.gray,P=td.pts.map(p=>[p[0]*(W-1),p[1]*(H-1)]),dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+  let ow=Math.max(dist(P[0],P[1]),dist(P[3],P[2])),oh=Math.max(dist(P[0],P[3]),dist(P[1],P[2]));
+  const k=Math.min(1,maxW/ow);ow=Math.max(8,Math.round(ow*k));oh=Math.max(8,Math.round(oh*k));
+  const [x0,y0]=P[0],[x1,y1]=P[1],[x2,y2]=P[2],[x3,y3]=P[3],dx1=x1-x2,dx2=x3-x2,sx=x0-x1+x2-x3,dy1=y1-y2,dy2=y3-y2,sy=y0-y1+y2-y3,den=dx1*dy2-dy1*dx2;
+  let g=0,h=0;if(Math.abs(den)>1e-9){g=(sx*dy2-dx2*sy)/den;h=(dx1*sy-sx*dy1)/den;}
+  const a=x1-x0+g*x1,b=x3-x0+h*x3,c=x0,d=y1-y0+g*y1,e=y3-y0+h*y3,f=y0,out=new Uint8Array(ow*oh);
+  for(let v=0;v<oh;v++){const tv=(v+0.5)/oh;for(let u=0;u<ow;u++){const tu=(u+0.5)/ow,q=g*tu+h*tv+1,x=(a*tu+b*tv+c)/q,y=(d*tu+e*tv+f)/q;
+    const xi=x<0?0:x>W-2?W-2:x|0,yi=y<0?0:y>H-2?H-2:y|0,fx=x-xi<0?0:x-xi>1?1:x-xi,fy=y-yi<0?0:y-yi>1?1:y-yi,i=yi*W+xi;
+    out[v*ow+u]=(G[i]*(1-fx)+G[i+1]*fx)*(1-fy)+(G[i+W]*(1-fx)+G[i+W+1]*fx)*fy;}}
+  if($('tdClean').checked)tdClean(out,ow,oh,+$('tdDark').value);
+  const cv=document.createElement('canvas');cv.width=ow;cv.height=oh;const cx=cv.getContext('2d'),im=cx.createImageData(ow,oh);
+  for(let i=0;i<ow*oh;i++){const v=out[i];im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255;}
+  cx.putImageData(im,0,0);return cv;
+}
+function tdDraw(){
+  if(!td.work)return;const box=$('tdLeft'),cv=$('tdSrc'),W=td.work.width,H=td.work.height,k=Math.min((box.clientWidth-8)/W,(box.clientHeight-8)/H),w=Math.max(60,Math.round(W*k)),h=Math.max(60,Math.round(H*k));
+  if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;}
+  const g=cv.getContext('2d');g.drawImage(td.work,0,0,w,h);
+  const P=td.pts.map(p=>[p[0]*w,p[1]*h]);
+  g.fillStyle='rgba(15,23,42,.5)';g.beginPath();g.rect(0,0,w,h);g.moveTo(P[0][0],P[0][1]);for(const i of [3,2,1])g.lineTo(P[i][0],P[i][1]);g.closePath();g.fill('evenodd');
+  g.strokeStyle='#2563eb';g.lineWidth=2;g.beginPath();P.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();g.stroke();
+  P.forEach(p=>{g.beginPath();g.arc(p[0],p[1],11,0,7);g.fillStyle='#fff';g.fill();g.lineWidth=3;g.stroke();});
+}
+function tdPreview(){if(!td.work)return;const c=tdRender(900),o=$('tdOut');o.width=c.width;o.height=c.height;o.getContext('2d').drawImage(c,0,0);}
+const tdSoon=()=>{clearTimeout(td.t);td.t=setTimeout(tdPreview,140);};
+function tidyPhoto(img,i,n){
+  return new Promise(res=>{td.src=img;td.q=0;tdSetWork();$('tdCount').textContent=n>1?`Photo ${i+1} of ${n}`:'';$('tidy').classList.add('open');td.resolve=res;setTimeout(()=>{tdDraw();tdPreview();},30);});
+}
+const tdDone=v=>{$('tidy').classList.remove('open');const r=td.resolve;td.resolve=null;td.gray=null;if(r)r(v);};
+$('tdOk').onclick=()=>{if(!td.work)return;tdDone(tdRender(TOUCH?2600:3400));};
+$('tdCancel').onclick=()=>tdDone(null);
+$('tdL').onclick=()=>{td.q=(td.q+3)%4;tdSetWork();tdDraw();tdPreview();};
+$('tdR').onclick=()=>{td.q=(td.q+1)%4;tdSetWork();tdDraw();tdPreview();};
+$('tdReset').onclick=()=>{td.pts=[[0,0],[1,0],[1,1],[0,1]];tdDraw();tdPreview();};
+$('tdClean').onchange=tdPreview;$('tdDark').oninput=tdSoon;
+{const cv=$('tdSrc'),pos=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height,r];};
+  cv.addEventListener('pointerdown',e=>{if(!td.pts)return;const [x,y,r]=pos(e);let best=-1,bd=48;td.pts.forEach((p,i)=>{const d=Math.hypot((p[0]-x)*r.width,(p[1]-y)*r.height);if(d<bd){bd=d;best=i;}});
+    td.drag=best;if(best>=0){try{cv.setPointerCapture(e.pointerId);}catch(err){}e.preventDefault();}});
+  cv.addEventListener('pointermove',e=>{if(td.drag<0)return;const [x,y]=pos(e);td.pts[td.drag]=[Math.max(0,Math.min(1,x)),Math.max(0,Math.min(1,y))];tdDraw();tdSoon();});
+  const up=()=>{if(td.drag>=0){td.drag=-1;tdPreview();}};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);}
+addEventListener('resize',()=>{if($('tidy').classList.contains('open'))tdDraw();});
+async function openPhotos(files){
+  const out=[];
+  for(let i=0;i<files.length;i++){const img=await loadImg(files[i]),c=await tidyPhoto(img,i,files.length);if(!c)break;out.push(c);}
+  if(!out.length){stat('No photo was taken in.');return;}
+  scan.pages=[];scan.cur=0;scan.name=files[0].name;scan.kind='img';scan.pdf=null;scan.imgs=out;scan.n=out.length;
+  $('pdfref').classList.add('open');scanInfo('Reading the photo…');await tick();
+  stat(`${out.length} photo${out.length>1?'s':''} tidied. Check the marked notes on the page, then read ${out.length>1?'them':'it'} into the score.`);
+  await showScanPage(0);
+}
 async function loadFile(f){
   const n=f.name.toLowerCase();
   try{
     if(n.endsWith('.json')){
       const d=JSON.parse(await f.text());
       if(d.app!=='tenor-viol-trainer'&&d.app!=='score-converter')throw new Error('not a Score Converter file');
-      sc.tr=Math.max(-24,Math.min(24,d.tr|0));sc.trS=d.trS|0;sc.scanName=typeof d.src==='string'?d.src.slice(0,200):'';   // (the files still say tenor-viol-trainer inside, as before)
+      sc.tr=Math.max(-24,Math.min(24,d.tr|0));sc.bm=Array.isArray(d.bm)?d.bm.filter(k=>Number.isInteger(k)&&k>=0).slice(0,60):[];sc.trS=d.trS|0;sc.scanName=typeof d.src==='string'?d.src.slice(0,200):'';   // (the files still say tenor-viol-trainer inside, as before)
       let items;
       const okItem=i=>i&&typeof i.d==='number'&&(i.m==null||typeof i.m==='number');
       if(Array.isArray(d.parts)&&d.parts.length){   // a score with parts
@@ -2146,8 +2291,10 @@ async function loadFile(f){
       const r=parseXml(await f.text());applyImported(r.items,r,f.name);
     }else if(n.endsWith('.mxl')){
       throw new Error('compressed .mxl is not supported: export as uncompressed .musicxml or as MIDI');
-    }else if(n.endsWith('.pdf')||f.type.startsWith('image/')){
+    }else if(n.endsWith('.pdf')){
       await openScan(f);
+    }else if(f.type.startsWith('image/')||/\.(jpe?g|png|webp|bmp|gif|heic|heif)$/.test(n)){
+      await openPhotos([f]);
     }else throw new Error('unsupported file type');
   }catch(err){stat('Import failed: '+err.message);}
 }
@@ -2169,7 +2316,7 @@ $('upBtn').onclick=()=>setDur((sc.bi-1+BASES.length)%BASES.length);
 $('downBtn').onclick=()=>setDur((sc.bi+1)%BASES.length);
 $('endBtn').onclick=()=>{sc.sel=-1;sc.cur=sc.items.length;drawRecording();stat('Adding notes at the end.');};
 function clearScore(){if(rec.on)stopRec();stopPlay();
-  sc.tr=0;sc.trS=0;sc.scanName='';
+  sc.tr=0;sc.trS=0;sc.scanName='';sc.bm=[];
   if(sc.parts.length>1){sc.parts=[newPart('Part 1','treble','piano',0)];sc.pi=0;sc.neckPart=0;sc.sel=-1;sc.cur=0;buildParts();drawRecording();stat('Cleared all parts.');return;}
   snap();sc.items=[];sc.sel=-1;sc.cur=0;drawRecording();buildParts();stat('Cleared (Undo brings it back).');}
 $('clearBtn').onclick=clearScore;
@@ -2178,6 +2325,42 @@ $('wipeBtn').onclick=()=>{   // always on screen: wipes any exercise, test or pi
   const n=sc.parts.length;
   if(confirm(n>1?`Delete the whole score, all ${n} parts? This cannot be undone.`:'Delete everything in the score? (Undo brings it back.)'))clearScore();};
 $('playBtn').onclick=playScore;
+// Bookmarks: a bar marked while the music plays (or the bar of the selected note). Pressing one plays from that bar.
+function bmNow(){
+  const map=barMap();if(!map.length)return -1;
+  let i=playing?playing.lit[sc.pi]:null;if(i==null&&sc.sel>=0)i=sc.sel;if(i==null)return playing?-1:0;
+  let k=0;map.forEach((b,j)=>{if(b.idx<=i)k=j;});return k;
+}
+function bmShow(){
+  const B=$('bmBar'),map=barMap(),pieces=map.filter(b=>b.kind==='piece').length;B.innerHTML='';sc.bm=(sc.bm||[]).filter(k=>k<map.length);
+  sc.bm.forEach(k=>{const b=map[k],w=document.createElement('span');w.className='bm';
+    const g=document.createElement('button');g.className='go';g.textContent='▶ '+(pieces>1?b.piece+': ':'')+'Bar '+b.bar;g.title='Play from this bookmark';g.onclick=()=>bmGo(k);
+    const x=document.createElement('button');x.className='x';x.textContent='×';x.title='Remove this bookmark';x.onclick=()=>{sc.bm=sc.bm.filter(q=>q!==k);bmShow();};
+    w.append(g,x);B.append(w);});
+  B.classList.toggle('has',sc.bm.length>0);
+}
+function bmAdd(){
+  if(!sc.parts.some(p=>p.items.length)){stat('Open a score first.');return;}
+  const k=bmNow();if(k<0){stat('Nothing has played yet: press the bookmark once the music has started.');return;}
+  const b=barMap()[k];if(sc.bm.includes(k)){stat(`Bar ${b.bar} already has a bookmark.`);return;}
+  if(sc.bm.length>=60){stat('That is a lot of bookmarks: remove one first.');return;}
+  sc.bm.push(k);sc.bm.sort((x,y)=>x-y);bmShow();stat(`Bookmark at bar ${b.bar}. Press it (above the score) to play from there.`);
+}
+function bmGo(k){
+  const map=barMap(),b=map[k];if(!b)return;
+  if(playing)stopPlay();if(sc.sel>=0){const old=sc.sel;sc.sel=-1;paintNote(old,null);}
+  const T=partTimes(leadPart())[sc.pi];sc.bmGo=T[b.idx]!=null?T[b.idx]:0;
+  const e=(noteEls.get(b.idx)||[])[0];if(e)(e.closest('svg')||e).scrollIntoView({block:'nearest'});
+  playScore();stat(`Playing from the bookmark at bar ${b.bar}.`);
+}
+$('bmBtn').onclick=bmAdd;
+$('lpBtn').onclick=()=>{lp.on=!lp.on;$('lpBtn').classList.toggle('on',lp.on);const was=playing;if(was)stopPlay();
+  if(lp.on){if($('cntSel').value==='0')$('cntSel').value='1';
+    if(!$('lpFrom').value){const bn=sc.sel>=0?barNoOf(sc.sel):0,map=barMap(),hit=sc.sel>=0&&map.filter(x=>x.idx<=sc.sel).pop();const b=hit?hit.bar:(bn||1);$('lpFrom').value=b;if(!$('lpTo').value)$('lpTo').value=b;}
+    stat('Loop is on: Play goes round the bars in the two boxes, with a count-in before each time. Change the boxes and press Play.');}
+  else stat('Loop is off.');
+  if(was)playScore();};
+['lpFrom','lpTo'].forEach(id=>{$(id).onkeydown=e=>{e.stopPropagation();if(e.key==='Enter'){if(playing)stopPlay();if(!lp.on)$('lpBtn').click();playScore();}};$(id).onchange=()=>{if(playing&&lp.on){stopPlay();playScore();}};});
 // Transposing. The score: every note and every key signature moves. The sound: what is played (and written into a MIDI
 // file) is so many semitones above or below the written notes, like a transposing instrument.
 const IVAL=['','a semitone','a tone','a minor third','a major third','a fourth','a tritone','a fifth','a minor sixth','a major sixth','a minor seventh','a major seventh','an octave'];
@@ -2207,7 +2390,7 @@ $('pOuBtn').onclick=()=>shiftPitch(1,'oct');$('pOdBtn').onclick=()=>shiftPitch(-
 // a file dropped anywhere on the page is opened
 addEventListener('dragover',e=>{e.preventDefault();document.body.classList.add('drag');});
 addEventListener('dragleave',e=>{if(!e.relatedTarget)document.body.classList.remove('drag');});
-addEventListener('drop',e=>{e.preventDefault();document.body.classList.remove('drag');const f=e.dataTransfer&&e.dataTransfer.files[0];if(f)loadFile(f);});
+addEventListener('drop',e=>{e.preventDefault();document.body.classList.remove('drag');if(e.dataTransfer&&e.dataTransfer.files.length)openFiles(e.dataTransfer.files);});
 function openFold(id,open){
   document.querySelectorAll('.foldp').forEach(x=>x.classList.toggle('open',x.id===id&&open));
   document.querySelectorAll('.fold').forEach(x=>x.classList.toggle('open',x.dataset.p===id&&open));
@@ -2274,10 +2457,14 @@ $('fromSel').onchange=()=>{const map=barMap(),v=$('fromSel').value,b=v==='start'
 $('fromBar').onchange=()=>{if(sc.sel>=0){const old=sc.sel;sc.sel=-1;paintNote(old,null);}};
 $('recBtn').onclick=()=>{rec.on?stopRec():startRec();};
 $('impBtn').onclick=()=>$('impFile').click();
-$('impFile').onchange=()=>{const f=$('impFile').files[0];if(f)loadFile(f);$('impFile').value='';};
+const isPic=f=>f.type.startsWith('image/')||/\.(jpe?g|png|webp|bmp|gif|heic|heif)$/i.test(f.name);
+const openFiles=fs=>{fs=[...fs];if(!fs.length)return;if(fs.length>1&&fs.every(isPic))openPhotos(fs).catch(e=>stat('Import failed: '+e.message));else loadFile(fs[0]);};
+$('impFile').onchange=()=>{openFiles($('impFile').files);$('impFile').value='';};
+$('photoBtn').onclick=()=>$('photoFile').click();
+$('photoFile').onchange=()=>{const fs=[...$('photoFile').files].filter(isPic);$('photoFile').value='';if(fs.length)openPhotos(fs).catch(e=>stat('Import failed: '+e.message));};
 $('pdfClose').onclick=()=>{$('pdfref').classList.remove('open');};
 // the whole score, as saved in a .json file (and kept on this device)
-const scoreData=()=>({app:'score-converter',tr:sc.tr||0,trS:sc.trS||0,src:sc.scanName||'',version:3,title:$('title').value,key:st.key,clef:st.clef,bpm:sc.bpm,ts:sc.ts,reverb:sc.reverb,part:sc.pi,neckPart:sc.neckPart,
+const scoreData=()=>({app:'score-converter',bm:(sc.bm||[]).slice(),tr:sc.tr||0,trS:sc.trS||0,src:sc.scanName||'',version:3,title:$('title').value,key:st.key,clef:st.clef,bpm:sc.bpm,ts:sc.ts,reverb:sc.reverb,part:sc.pi,neckPart:sc.neckPart,
   parts:sc.parts.map(p=>({name:p.name,clef:p.clef,mainClef:p.mainClef||null,kb:p.kb||null,pb:!!p.pb,v2:p.v2||null,sound:p.sound,viol:violOf(p),vol:p.vol,pan:p.pan,mute:p.mute,solo:p.solo,items:p.items}))});
 $('expBtn').onclick=()=>{
   if(rec.on)stopRec();
@@ -2370,6 +2557,7 @@ addEventListener('keydown',e=>{
   else if(e.key>='1'&&e.key<='6')setDur(+e.key-1);
   else if(e.key==='.')setDots((sc.dots+1)%3);
   else if(e.key==='r'||e.key==='R')addItem(null);
+  else if(e.key==='m'||e.key==='M')bmAdd();
   else if(/^[a-gA-G]$/.test(e.key))addLetter(e.key.toUpperCase());
   else if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();delNote();}
 });
