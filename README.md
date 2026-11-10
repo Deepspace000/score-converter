@@ -10,7 +10,7 @@ Open it here: https://deepspace000.github.io/score-converter/
 - **Play it**: every part together, with mute, solo, volume, pan and sound for each part. Start from any bar. The score follows the music.
 - **Change the tempo**: the Tempo box (a printed metronome mark sets it when the score is read).
 - **Change the notes**: drag a note up or down on the staff, or click it and use the arrow keys or the buttons under **Edit** to change its pitch or rhythm, delete it, or add notes and rests. Key, time signature and title can be changed too.
-- **Re-scan bars**: if some bars came out wrong, type their numbers under **Edit** (or click a note in the bar) and press **Re-scan from the page**. Each bar is cut out of the printed page and read again on its own. **Undo re-scan** puts the old notes back.
+- **Re-scan bars**: if some bars came out wrong, type their numbers under **Edit** (or click a note in the bar) and press **Re-scan from the page**. The bar is cut out of the printed page and read again. Each further press reads it a different way (on its own, larger, smaller, with the bars either side, each staff by itself, with the print made heavier or lighter) and shows the next reading you have not seen yet. **Undo re-scan** goes back one press at a time.
 - **Transpose**: the score and the sound together, the score only, or the sound only.
 - **Choose the sounds**: pianos, harpsichord, choir, flute, recorder, oboe, clarinet, bassoon and strings, for each part.
 - **Save it**: **Save score** keeps everything in one file to open again later. Export as MIDI (every part, the piano only, or the parts you tick), MusicXML or PDF.

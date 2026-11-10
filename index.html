@@ -120,7 +120,7 @@ span.pname{min-width:0;color:var(--dim)}
   </div>
   <div class="controls">
     <label title="Read these bars again from the printed page, each on its own">Re-scan bars <input type="number" id="rsFrom" min="1" style="width:60px"> to <input type="number" id="rsTo" min="1" style="width:60px"></label>
-    <button id="rsGo">Re-scan from the page</button>
+    <button id="rsGo" title="Each press reads the bars in a different way, until you see the right notes">Re-scan from the page</button>
     <button id="rsUndo" style="display:none">Undo re-scan</button>
   </div>
   <div class="controls">
@@ -172,7 +172,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.3';
+const APP_VERSION='5.4';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -1969,29 +1969,39 @@ $('scPages').onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')$('scSome').cl
 /* ---- reading a few bars again, each on its own ----
    The bar is cut out of the printed page (with the clefs and key signature from the start of its line in front of it),
    drawn larger, and read by itself. What comes out replaces the bar in every part. */
-let rsUndoData=null;const rsCache=new Map();
+const rsUndo=[],rsCache=new Map(),rsState=new Map();
 const barStarts=its=>{const o=[];(its||[]).forEach((it,i)=>{if(it.bar!=null)o.push(i);});return o;};
 function barNoOf(i){if(!part().pb)return 0;let n=0;for(let j=0;j<=i&&j<sc.items.length;j++)if(sc.items[j].bar!=null)n++;return n;}
-async function rescanOne(k){
-  const P0=sc.parts[0],S0=barStarts(P0.items),f=P0.items[S0[k]],id=/^(\d+)\.(\d+)$/.exec(String(f.bar));if(!id)return -1;
-  const pg=+id[1],sys=+id[2],sp=scan.pages[pg]||await readScanPage(pg);if(!sp)return -1;
-  const page=sp.page,grp=page.staves.filter(x=>x.sys===sys);if(!grp.length)return -1;
-  const p=grp[0].p,nx=P0.items[S0[k+1]],right=Math.max(...grp.map(x=>x.right)),left=Math.min(...grp.map(x=>x.left));
-  const x0=(f.bx||0)*p,x1=nx&&nx.bar===f.bar&&nx.bx>(f.bx||0)?nx.bx*p:right;
-  const gi=page.staves.indexOf(grp[0]),prev=page.staves[gi-1],next=page.staves[gi+grp.length],last=grp[grp.length-1],PH=page.H||1e9;
-  const yT=Math.max(0,grp[0].top-7*p,prev?(prev.bot+grp[0].top)/2:0),yB=Math.min(PH,last.bot+7*p,next?(last.bot+next.top)/2:PH);
-  // Read at the size the page was read at. If the bar does not add up, try a little larger and a little smaller.
-  let pick=null,best=-1e9;
-  for(const Fz of [1,1.2,0.88]){const r=await readAt(Fz);if(!r)continue;
-    let sc0=r.res.bad?-1000:0;r.res.parts.forEach(q=>[q.items,q.v2||[]].forEach(l=>l.forEach(x=>{if(x.m!=null)sc0+=1+(x.ch?x.ch.length:0);})));
-    if(sc0>best){best=sc0;pick=r;}}
-  if(!pick)return -1;
-  const {np,res}=pick;
-  async function readAt(Fz){
-  const ck=pg+':'+Fz;let c=rsCache.get(ck);if(!c){c=await renderScan(pg,Math.round(page.W*Fz));rsCache.set(ck,c);}
-  const hx=Math.min(...grp.map(x=>x.musicStart))-0.25*p,L0=Math.max(0,left-3*p),xe=Math.min(page.W,x1+0.5*p);
-  const segs=x0>0?[[L0,hx],[x0+0.3*p,xe]]:[[L0,xe]],gap=x0>0?Math.round(1.5*p*Fz):0,pad=40,sh=Math.min(c.height-Math.round(yT*Fz),Math.round((yB-yT)*Fz));
-  const w=segs.reduce((a,q)=>a+Math.round((q[1]-q[0])*Fz),0)+gap+2*pad,h=sh+2*pad;
+// The ways a bar is read again. Each press of Re-scan goes on to the next way that gives notes not seen before.
+const RS_METHODS=[
+  {n:'the bar on its own',F:1},
+  {n:'the bar on its own, drawn larger',F:1.25},
+  {n:'the bar on its own, drawn smaller',F:0.85},
+  {n:'the bar with the bars either side of it',F:1,ctx:1},
+  {n:'each staff of the bar by itself',F:1,solo:1},
+  {n:'the bar with the print made heavier',F:1.1,ink:1},
+  {n:'the bar with the print made lighter',F:1.1,ink:-1},
+  {n:'the bar with the bars either side, drawn larger',F:1.25,ctx:1},
+  {n:'each staff by itself, drawn larger',F:1.25,solo:1}
+];
+const rsSig=l=>(l||[]).filter(x=>!x.hid).map(x=>[x.m,(x.ch||[]).join('+'),x.d].join(':')).join(' ');
+// where bar k stands on the printed page: its page, its line, and the bars that share the line
+function rsGeom(k){
+  const P0=sc.parts[0],S0=barStarts(P0.items),f=P0.items[S0[k]],id=/^(\d+)\.(\d+)$/.exec(String(f&&f.bar));if(!id)return null;
+  let a=k;while(a>0&&P0.items[S0[a-1]].bar===f.bar)a--;let b=k;while(b+1<S0.length&&P0.items[S0[b+1]].bar===f.bar)b++;
+  return {pg:+id[1],sys:+id[2],first:a,last:b,bx:i=>P0.items[S0[i]].bx||0};
+}
+// heavier print: every dot takes the darkest of itself and its neighbours to the left and above; lighter: the lightest
+function rsInk(o,dir){
+  const g=o.getContext('2d',{willReadFrequently:true}),im=g.getImageData(0,0,o.width,o.height),d=im.data,w=o.width,h=o.height,a=new Uint8Array(w*h),b=new Uint8Array(w*h);
+  for(let i=0;i<w*h;i++)a[i]=(d[i*4]*3+d[i*4+1]*6+d[i*4+2])/10;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){let v=a[y*w+x];if(x){const q=a[y*w+x-1];if(dir>0?q<v:q>v)v=q;}if(y){const q=a[(y-1)*w+x];if(dir>0?q<v:q>v)v=q;}b[y*w+x]=v;}
+  for(let i=0;i<w*h;i++)d[i*4]=d[i*4+1]=d[i*4+2]=b[i];
+  g.putImageData(im,0,0);
+}
+// the piece of the page for some bars: the start of the line (clefs, key) and then the bars, cut out and put side by side
+function rsCut(c,segs,gap,yT,yB,Fz,p){
+  const pad=40,sh=Math.min(c.height-Math.round(yT*Fz),Math.round((yB-yT)*Fz)),w=segs.reduce((t,q)=>t+Math.round((q[1]-q[0])*Fz),0)+gap+2*pad,h=sh+2*pad;
   const o=document.createElement('canvas');o.width=w;o.height=h;const g=o.getContext('2d',{willReadFrequently:true});g.fillStyle='#fff';g.fillRect(0,0,w,h);
   let dx=pad;
   segs.forEach((q,si)=>{const sw=Math.round((q[1]-q[0])*Fz);g.drawImage(c,Math.round(q[0]*Fz),Math.round(yT*Fz),sw,sh,dx,pad,sw,sh);dx+=sw;
@@ -2000,57 +2010,112 @@ async function rescanOne(k){
       for(let x=0;x<cw;x++){let n=0;for(let y=0;y<sh;y++)if(d[(y*cw+x)*4]<128)n++;if(n<bn){bn=n;best=x;}}
       const col=g.getImageData(dx-cw+best,pad,1,sh),strip=document.createElement('canvas');strip.width=1;strip.height=sh;strip.getContext('2d').putImageData(col,0,0);
       g.imageSmoothingEnabled=false;g.drawImage(strip,0,0,1,sh,dx,pad,gap,sh);dx+=gap;}});
-  const np=omrReadPage(g.getImageData(0,0,w,h),true);np.no=0;np.texts=[];np.poly=true;rescanOne.last=o;
-  if(np.staves.length!==grp.length)return null;
-  const plan=omrPolyPlan([np]);if(plan.length!==grp.length)return null;
-  np.staves.forEach(x=>{x.forceSec=false;x.pieceNo=1;});
-  plan.forEach((pl,q)=>omrSettle([{...np,staves:np.staves.filter(x=>x.part===q)}],pl.clef||st.clef));
-  np.staves.forEach((x,j)=>{const og=grp[j];x.keyFinal=og.keyFinal!=null?og.keyFinal:og.fifths;x.pieceTs=og.pieceTs||null;let ct=og.clefType;(og.clefCh||[]).forEach(cc=>{if(cc.x<x0+0.3*p)ct=cc.t;});if(ct)x.clefType=ct;});
-  const res=omrPolyItems([np],plan,st.clef,null,barTicks());
-  return {np,res};
+  return o;
+}
+// one way of reading bar k: what each staff of its line holds in that bar, or null when it cannot be read this way
+async function rsRead(k,M,G,sp){
+  const page=sp.page,grp=page.staves.filter(x=>x.sys===G.sys);if(!grp.length)return null;
+  const p=grp[0].p,right=Math.max(...grp.map(x=>x.right)),left=Math.min(...grp.map(x=>x.left));
+  const ka=M.ctx?Math.max(G.first,k-1):k,kb=M.ctx?Math.min(G.last,k+1):k;if(M.ctx&&ka===kb)return null;
+  const x0=G.bx(ka)*p,x1=kb<G.last?G.bx(kb+1)*p:right;
+  const gi=page.staves.indexOf(grp[0]),prev=page.staves[gi-1],next=page.staves[gi+grp.length],PH=page.H||1e9;
+  const Fz=M.F,ck=G.pg+':'+Fz;let c=rsCache.get(ck);if(!c){c=await renderScan(G.pg,Math.round(page.W*Fz));rsCache.set(ck,c);}
+  const hx=Math.min(...grp.map(x=>x.musicStart))-0.25*p,L0=Math.max(0,left-3*p),xe=Math.min(page.W,x1+0.5*p);
+  const segs=x0>0?[[L0,hx],[x0+0.3*p,xe]]:[[L0,xe]],gap=x0>0?Math.round(1.5*p*Fz):0;
+  const band=(j0,j1)=>{const up=j0?grp[j0-1]:prev,dn=j1+1<grp.length?grp[j1+1]:next;return [Math.max(0,grp[j0].top-7*p,up?(up.bot+grp[j0].top)/2:0),Math.min(PH,grp[j1].bot+7*p,dn?(grp[j1].bot+dn.top)/2:PH)];};
+  const jobs=M.solo?grp.map((x,j)=>[j]):[grp.map((x,j)=>j)];if(M.solo&&grp.length<2)return null;
+  const per=[],count=kb-ka+1,sum=l=>l.reduce((t,x)=>t+x.d,0);
+  for(const js of jobs){
+    const [yT,yB]=band(js[0],js[js.length-1]),o=rsCut(c,segs,gap,yT,yB,Fz,p);if(M.ink)rsInk(o,M.ink);rescanOne.last=o;
+    const np=omrReadPage(o.getContext('2d',{willReadFrequently:true}).getImageData(0,0,o.width,o.height),true);np.no=0;np.texts=[];np.poly=true;
+    if(np.staves.length!==js.length)return null;
+    const plan=omrPolyPlan([np]);if(plan.length!==js.length)return null;
+    np.staves.forEach(x=>{x.forceSec=false;x.pieceNo=1;});
+    plan.forEach((pl,q)=>omrSettle([{...np,staves:np.staves.filter(x=>x.part===q)}],pl.clef||st.clef));
+    np.staves.forEach((x,i)=>{const og=grp[js[i]];x.keyFinal=og.keyFinal!=null?og.keyFinal:og.fifths;x.pieceTs=og.pieceTs||null;let ct=og.clefType;(og.clefCh||[]).forEach(cc=>{if(cc.x<x0+0.3*p)ct=cc.t;});if(ct)x.clefType=ct;});
+    const res=omrPolyItems([np],plan,st.clef,null,barTicks());
+    for(let i=0;i<js.length;i++){
+      const R=res.parts[np.staves[i].part];if(!R||!R.items.length)return null;
+      let items=R.items,v2=R.v2||null;
+      if(count>1){const S=barStarts(R.items);if(S.length!==count)return null;items=R.items.slice(S[k-ka],k-ka+1<S.length?S[k-ka+1]:R.items.length);
+        if(v2){const SV=barStarts(v2);v2=SV.length===count?v2.slice(SV[k-ka],k-ka+1<SV.length?SV[k-ka+1]:v2.length):null;}}
+      per[js[i]]={items,v2:v2&&v2.some(x=>x.m!=null)?v2:null};
+    }
   }
+  return per;
+}
+// what a reading would put into every part (null when it is not a full bar in some part)
+function rsPlan(k,grp,per){
   const T=sc.trS||0,sum=l=>l.reduce((t,x)=>t+x.d,0),copy=l=>l.map(x=>{const y=Object.assign({},x);delete y.sec;delete y.bar;delete y.bx;if(T){if(y.m!=null)y.m+=T;if(y.ch)y.ch=y.ch.map(m=>m+T);if(y.tn)y.tn=y.tn.map(m=>m+T);}return y;});
   const todo=[];
   for(let j=0;j<grp.length;j++){
-    const pi=grp[j].part,P=sc.parts[pi],R=res.parts[np.staves[j].part];if(!P||!R||!R.items.length)return -1;
-    const S=barStarts(P.items),a=S[k],b=k+1<S.length?S[k+1]:P.items.length;if(a==null)return -1;
-    const old=P.items.slice(a,b),N=copy(R.items);if(Math.abs(sum(N)-sum(old))>0.02)return -1;
-    todo.push({P,a,b,old,N,V:R.v2&&R.v2.some(x=>x.m!=null)?copy(R.v2):null});
+    const P=sc.parts[grp[j].part],R=per[j];if(!P||!R)return null;
+    const S=barStarts(P.items),a=S[k],b=k+1<S.length?S[k+1]:P.items.length;if(a==null)return null;
+    const old=P.items.slice(a,b),N=copy(R.items);if(!N.length||Math.abs(sum(N)-sum(old))>0.02)return null;
+    todo.push({P,a,b,old,N,V:R.v2?copy(R.v2):null});
   }
-  const sig=l=>l.filter(x=>!x.hid).map(x=>[x.m,(x.ch||[]).join('+'),x.d].join(':')).join(' ');let changed=0;
+  return todo;
+}
+function rsApply(k,todo){
+  const sum=l=>l.reduce((t,x)=>t+x.d,0);
   for(const {P,a,b,old,N,V} of todo){
-    const f0=old[0];N[0].bar=f0.bar;N[0].bx=f0.bx;if(f0.sec)N[0].sec=f0.sec;if(f0.rs)N[0].rs=true;if(old[old.length-1].re)N[N.length-1].re=true;if(f0.v!=null)N.forEach(x=>{x.v=f0.v;});
+    const f0=old[0];N[0].bar=f0.bar;N[0].bx=f0.bx;if(f0.sec)N[0].sec=f0.sec;if(f0.rs)N[0].rs=true;if(old[old.length-1].re)N[N.length-1].re=true;if(f0.v!=null)N.forEach(x=>{x.v=f0.v;});if(f0.cl&&!N[0].cl)N[0].cl=f0.cl;
+    // the words, tempo words and loud and soft marks that came from the page's text stay with their notes
     {let t=0;const at=new Map();N.forEach(x=>{const q=Math.round(t*12);if(!at.has(q))at.set(q,x);t+=x.d;});t=0;
       old.forEach(x=>{const y=at.get(Math.round(t*12));t+=x.d;if(!y)return;if(x.ly&&y.m!=null&&!y.ly)y.ly=x.ly;if(x.tx&&!y.tx)y.tx=x.tx;if(x.dyn&&y.m!=null&&!y.dyn)y.dyn=x.dyn;});}
-    if(sig(N)!==sig(old))changed++;
     P.items.splice(a,b-a,...N);
     if(P.v2||V){
       if(!P.v2){const S2=barStarts(P.items);P.v2=S2.map((s0,bi)=>{const e=bi+1<S2.length?S2[bi+1]:P.items.length,ff=P.items[s0];return {m:null,d:sum(P.items.slice(s0,e)),hid:true,bar:ff.bar,bx:ff.bx};});}
       const SV=barStarts(P.v2),va=SV[k],vb=k+1<SV.length?SV[k+1]:P.v2.length;
-      if(va!=null){const NV=V||[{m:null,d:sum(N),hid:true}];NV[0].bar=f0.bar;NV[0].bx=f0.bx;if(sig(NV)!==sig(P.v2.slice(va,vb)))changed++;P.v2.splice(va,vb-va,...NV);}
+      if(va!=null){const NV=V||[{m:null,d:sum(N),hid:true}];NV[0].bar=f0.bar;NV[0].bx=f0.bx;P.v2.splice(va,vb-va,...NV);}
     }
   }
-  return changed;
+}
+// Reads bar k again: goes through the ways not yet tried for it until one gives a full bar with notes not seen before.
+async function rescanOne(k){
+  const G=rsGeom(k);if(!G)return {fail:true};
+  const sp=scan.pages[G.pg]||await readScanPage(G.pg);if(!sp)return {fail:true};
+  const grp=sp.page.staves.filter(x=>x.sys===G.sys);if(!grp.length)return {fail:true};
+  const now=()=>grp.map(g0=>{const P=sc.parts[g0.part];if(!P)return '';const S=barStarts(P.items),a=S[k],b=k+1<S.length?S[k+1]:P.items.length;let t=rsSig(P.items.slice(a,b));
+    if(P.v2){const SV=barStarts(P.v2);t+='|'+rsSig(P.v2.slice(SV[k],k+1<SV.length?SV[k+1]:P.v2.length));}return t;}).join(' / ');
+  let stt=rsState.get(k);if(!stt){stt={next:0,seen:new Set()};rsState.set(k,stt);}
+  stt.seen.add(now());let readable=0;
+  for(let mi=stt.next;mi<RS_METHODS.length;mi++){
+    const M=RS_METHODS[mi];stat(`Bar ${k+1}: reading ${M.n} (way ${mi+1} of ${RS_METHODS.length})…`);await tick();
+    let per=null;try{per=await rsRead(k,M,G,sp);}catch(e){console.error(e);}
+    const todo=per&&rsPlan(k,grp,per);if(!todo)continue;
+    readable++;
+    const sg=todo.map(t=>rsSig(t.N)+(t.P.v2||t.V?'|'+rsSig(t.V):'')).join(' / ');
+    if(stt.seen.has(sg))continue;
+    stt.seen.add(sg);stt.next=mi+1;rsApply(k,todo);return {method:mi};
+  }
+  stt.next=0;stt.seen=new Set();return {none:true,readable};
 }
 async function rescanBars(b0,b1){
   if(!sc.parts.every(p=>p.pb)||!sc.parts[0].items.some(it=>/^\d+\.\d+$/.test(String(it.bar)))){stat('Only a score with a piano part or several voices, read from printed music, can be re-scanned bar by bar.');return;}
   if(!scan.kind||(sc.scanName&&scan.name!==sc.scanName)){stat('The printed pages are not open. Press Open score, choose '+(sc.scanName||'the same file')+' again, press Close on the page view, then re-scan.');return;}
+  if(rsState.owner!==sc.parts[0]){rsState.clear();rsState.owner=sc.parts[0];}
   const nb=barStarts(sc.parts[0].items).length;b0=Math.max(1,Math.min(nb,b0|0));b1=Math.max(b0,Math.min(nb,b1|0));
   if(b1-b0>15){stat('Re-scan up to 16 bars at a time.');return;}
   stopPlay();
-  const before=JSON.stringify(sc.parts.map(p=>({items:p.items,v2:p.v2||null})));let ok=0,changed=0;const bad=[];
+  const before=JSON.stringify(sc.parts.map(p=>({items:p.items,v2:p.v2||null})));const got=[],none=[],bad=[];
   $('rsGo').disabled=true;
   for(let k=b1-1;k>=b0-1;k--){
-    stat(`Reading bar ${k+1} again…`);await tick();
-    try{const r=await rescanOne(k);if(r<0)bad.push(k+1);else{ok++;changed+=r;}}catch(e){console.error(e);bad.push(k+1);}
+    let r={fail:true};try{r=await rescanOne(k);}catch(e){console.error(e);}
+    if(r.method!=null)got.unshift([k+1,r.method]);else if(r.none)none.unshift(k+1);else bad.unshift(k+1);
   }
   $('rsGo').disabled=false;rsCache.forEach(freeCanvas);rsCache.clear();
-  if(ok){rsUndoData=before;$('rsUndo').style.display=changed?'':'none';sc.sel=-1;sc.cur=sc.items.length;sc.parts.forEach(p=>{p.hist=[];});keepScroll(drawRecording);buildParts();}
-  const span=b0===b1?'Bar '+b0:'Bars '+b0+' to '+b1;bad.sort((x,y)=>x-y);
-  stat((ok?`${span} read again from the page: ${changed?changed+(changed===1?' staff came':' staves came')+' out differently (Undo re-scan puts the old notes back)':'the same notes as before'}.`:`${span}: the re-scan did not work.`)+(bad.length?` Bar ${bad.join(', ')} did not come out as a full bar on its own and was left as it was.`:''));
+  if(got.length){rsUndo.push(before);if(rsUndo.length>30)rsUndo.shift();$('rsUndo').style.display='';sc.sel=-1;sc.cur=sc.items.length;sc.parts.forEach(p=>{p.hist=[];});keepScroll(drawRecording);buildParts();}
+  const way=m=>`way ${m+1} of ${RS_METHODS.length}: ${RS_METHODS[m].n}`;let t='';
+  if(got.length===1)t+=`Bar ${got[0][0]} now shows another reading (${way(got[0][1])}). Not right? Press Re-scan again for the next way, or Undo re-scan to go back. `;
+  else if(got.length)t+=`Bars ${got.map(x=>x[0]).join(', ')} now show another reading. Not right? Press Re-scan again for the next way, or Undo re-scan to go back. `;
+  if(none.length)t+=`Bar ${none.join(', ')}: every way of reading it gives notes you have already seen, so nothing changed. Pressing Re-scan again starts from the first way; or change the notes by hand. `;
+  if(bad.length)t+=`Bar ${bad.join(', ')} could not be found on the page.`;
+  stat(t.trim());
 }
 $('rsGo').onclick=()=>{const a=+$('rsFrom').value,b=+$('rsTo').value||a;if(!a){stat('Click a note in the bar to re-scan, or type the bar numbers.');return;}rescanBars(Math.min(a,b),Math.max(a,b));};
-$('rsUndo').onclick=()=>{if(!rsUndoData)return;try{const d=JSON.parse(rsUndoData);d.forEach((x,i)=>{if(sc.parts[i]){sc.parts[i].items=x.items;sc.parts[i].v2=x.v2;sc.parts[i].hist=[];}});}catch(e){}rsUndoData=null;$('rsUndo').style.display='none';sc.sel=-1;sc.cur=sc.items.length;keepScroll(drawRecording);buildParts();stat('The bars are as they were before the re-scan.');};
+$('rsUndo').onclick=()=>{if(!rsUndo.length)return;try{const d=JSON.parse(rsUndo.pop());d.forEach((x,i)=>{if(sc.parts[i]){sc.parts[i].items=x.items;sc.parts[i].v2=x.v2;sc.parts[i].hist=[];}});}catch(e){}
+  $('rsUndo').style.display=rsUndo.length?'':'none';sc.sel=-1;sc.cur=sc.items.length;keepScroll(drawRecording);buildParts();stat('Back to the notes before that re-scan.'+(rsUndo.length?' Undo re-scan again goes back one more.':''));};
 ['rsFrom','rsTo'].forEach(id=>{$(id).onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')$('rsGo').click();};});
 async function loadFile(f){
   const n=f.name.toLowerCase();
