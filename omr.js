@@ -1160,7 +1160,7 @@ function omrReadPage(imgData, again) {
         let flags = 0;
         if (again && h >= 1.2 * p && h <= 4.6 * p && w >= 0.45 * p && w <= 1.6 * p && fill < 0.75) {
           const rows = []; for (let yy = miny; yy <= maxy; yy++) { let n = 0; for (let xx = minx; xx <= maxx; xx++) if (filled[(yy + y0) * W + xx + x0]) n++; rows.push(n); }
-          const nb = Math.max(2, Math.round(0.2 * h)); let thin = true, any = false;
+          const nb = Math.max(2, Math.round(0.3 * h)); let thin = true, any = false;   // (a crotchet rest's thin tail is short: under its broad hook)
           for (let r = rows.length - nb; r < rows.length; r++) { if (rows[r] > 0.4 * p) thin = false; if (rows[r]) any = true; }
           if (thin && any) { let inRun = false; for (const n of rows) { if (!n) continue; if (n >= 0.5 * p) { if (!inRun) { flags++; inRun = true; } } else inRun = false; } }
         }
@@ -1811,8 +1811,8 @@ function omrLyrics(page) {
     if (w.length) st.label = w.map(t => t.str.trim()).join(' ').replace(/\s+/g, ' ').replace(/\.$/, '').slice(0, 24);
   });
   page.staves.forEach((st, si) => {
-    if (!st.pe || !st.pe.length) return;
-    const p = st.p, next = page.staves[si + 1], ya = st.bot + 0.8 * p, yb = next && next.top > st.bot ? Math.min(st.bot + 8 * p, next.top - 0.4 * p) : st.bot + 8 * p;
+    if (!st.pe || !st.pe.length || st.kb === 'L') return;   // (under the piano's lower staff stand footers and pedal marks, not words to sing)
+    const p = st.p, next = page.staves[si + 1], ya = st.bot + 0.8 * p, yb = next && next.top > st.bot ? Math.min(st.bot + 13 * p, next.top - 0.4 * p) : st.bot + 13 * p;   // (room for three or four verses)
     const notes = st.pe.filter(e => e.kind === 'note'); if (!notes.length) return;
     const words = page.texts.filter(t => t.y > ya && t.y < yb && t.x > st.musicStart - 2 * p && t.size >= 1.1 * p && t.size <= 3.6 * p && /[A-Za-zÀ-ɏ&]/.test(t.str) && !OMR_DYNW.test(t.str.trim())).sort((a, b) => a.y - b.y || a.x - b.x);
     if (words.length < 2) return;
@@ -1895,7 +1895,7 @@ function omrPolyItems(pages, plan, clef, fifthsOverride, barT) {
               if (e.up != null && two) it.up = e.up;
               if (e.art && e.art.length) it.art = e.art.slice();
               if (e.dyn) it.dyn = e.dyn;
-              if (e.ly) it.ly = e.ly.filter(Boolean).join('\n');
+              if (e.ly) it.ly = Array.from(e.ly, x => x || '').join('\n').replace(/\n+$/, '');   // (a verse with no syllable here keeps its row)
               if (e.tx && !vi) it.tx = e.tx;
               if (e.hs && !vi) it.hs = e.hs;
               if (e.he && !vi) it.he = 1;
@@ -1910,6 +1910,7 @@ function omrPolyItems(pages, plan, clef, fifthsOverride, barT) {
         });
         const f0 = P.items[first[0]], l0 = P.items[P.items.length - 1], g0 = P.v2[first[1]];
         f0.bar = g0.bar = page.no + '.' + sy.sys; f0.bx = g0.bx = bar.b > 0 ? +(bar.x0 / sy.p).toFixed(2) : 0;
+        if (st) { let ct = st.clefType || null; for (const cc of (st.clefCh || [])) if (cc.x < mid) ct = cc.t; if (ct) f0.cl = ct; }   // the clef most of this bar is in
         if (bar.rs) f0.rs = true;
         if (bar.re) l0.re = true;
         if (vol) for (let q = first[0]; q < P.items.length; q++) P.items[q].v = vol.n;

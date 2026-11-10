@@ -164,7 +164,7 @@ span.pname{min-width:0;color:var(--dim)}
 </div>
 
 <script src="vexflow.js"></script>
-<script src="omr.js?v=2.4"></script>
+<script src="omr.js?v=2.5"></script>
 <script>
 const {Renderer,Stave,StaveNote,Voice,Formatter,Accidental,Dot,Beam,StaveTie,Barline,Volta,GhostNote,StaveConnector,Tuplet,Fraction,Articulation,Curve,GraceNote,GraceNoteGroup,Glyph} = Vex.Flow;
 // (parts of the page that are not there answer with a stand-in, so nothing depends on them)
@@ -172,7 +172,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.2';
+const APP_VERSION='5.3';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -924,6 +924,7 @@ function splitBars(items,pb){
   const bars=[];let bar=null,used=0;
   const open=sec=>{bar=[];bar.key=key;bar.ts=ts;bar.sym=sym;bar.clef=clef;bar.cap=ts[0]*64/ts[1];bar.sec=sec;bars.push(bar);used=0;};
   items.forEach((it,idx)=>{
+    if(it.cl)clef=it.cl;
     if(it.sec){
       const prevKey=key,prevTs=ts;
       if(it.sec.k!=null)key=it.sec.k;if(it.sec.ts){ts=it.sec.ts;sym=it.sec.sym||null;}if(it.sec.clef)clef=it.sec.clef;
@@ -1051,15 +1052,29 @@ function addArts(ps,notes){ps.forEach((p,i)=>{const sn=notes[i];if(!p.art||!sn||
   p.art.forEach(a=>{if(!ARTV[a])return;try{sn.addModifier(new Articulation(ARTV[a]).setPosition(a==='fe'?3:(sn.getStemDirection()>0?4:3)),0);}catch(e){}});});}
 // dynamics under the staff (over it for a voice part, whose words go underneath)
 const hasWords=()=>sc.parts.some(p=>p.items.some(i=>i.ly));
+// room under each staff for the words: one row for each verse
+const lyRoom=()=>{let n=0;sc.parts.forEach(p=>p.items.forEach(i=>{if(i.ly){const c=i.ly.split('\n').length;if(c>n)n=c;}}));return n?6+n*17:0;};
+function fitLyrics(){
+  document.querySelectorAll('#recscore svg').forEach(svg=>{
+    const rows=new Map();svg.querySelectorAll('text.lyr').forEach(t=>{const y=Math.round(+t.getAttribute('y'));if(!rows.has(y))rows.set(y,[]);rows.get(y).push(t);});
+    rows.forEach(list=>{
+      const L=list.map(t=>({t,x:+t.getAttribute('x'),w:0,f:16})).sort((a,b)=>a.x-b.x);
+      try{L.forEach(o=>{o.w=o.t.getComputedTextLength();});}catch(e){return;}
+      for(let i=0;i+1<L.length;i++){const a=L[i],b=L[i+1],room=b.x-a.x-4,need=(a.w*a.f/16+b.w*b.f/16)/2;
+        if(need>room&&room>0){const k=Math.max(0.6,room/need);a.f=Math.min(a.f,16*k);b.f=Math.min(b.f,16*k);}}
+      L.forEach(o=>{if(o.f<15.9)o.t.setAttribute('font-size',o.f.toFixed(1));});
+    });
+  });
+}
 function drawMarks(ctx,svg,stave,pieces,notes,above){
   const rows=(showNames()?1:0)+(showSolfa()?1:0);
   // the words of a song, under their notes (below the note names when those are shown)
   let lyDrop=0;if(pieces.some(p=>p.ly))notes.forEach(sn=>{try{if(sn.ghost||!sn.getBoundingBox)return;const b=sn.getBoundingBox(),low=b.getY()+b.getH()-(stave.getYForLine(4)+26);if(low>lyDrop)lyDrop=Math.min(30,low);}catch(e){}});
   pieces.forEach((p,i)=>{const sn=notes[i];if(!p.ly||!sn||sn.ghost||p.tiePrev)return;
     let x;try{x=(sn.getNoteHeadBeginX()+sn.getNoteHeadEndX())/2;}catch(e){return;}
-    p.ly.split('\n').forEach((line,li)=>{const y=stave.getYForLine(4)+(rows?52+rows*15:44)+li*17+lyDrop;
+    p.ly.split('\n').forEach((line,li)=>{if(!line)return;const y=stave.getYForLine(4)+(rows?52+rows*15:44)+li*17+lyDrop;
       const put=(s,xx)=>{const t=document.createElementNS(SVGNS,'text');t.setAttribute('x',xx.toFixed(1));t.setAttribute('y',y.toFixed(1));
-        t.setAttribute('text-anchor','middle');t.setAttribute('font-family',SCORE_FONT);t.setAttribute('font-size','16');t.setAttribute('fill','#000');t.textContent=s;svg.appendChild(t);};
+        t.setAttribute('text-anchor','middle');t.setAttribute('font-family',SCORE_FONT);t.setAttribute('font-size','16');t.setAttribute('fill','#000');t.setAttribute('class','lyr');t.textContent=s;svg.appendChild(t);};
       // a syllable that goes on: its hyphen stands half way to the next syllable, as in print
       let nx=null;if(/-$/.test(line))for(let k=i+1;k<pieces.length;k++){const q=pieces[k],qn=notes[k];if(!q.ly||!qn||qn.ghost||q.tiePrev)continue;try{nx=(qn.getNoteHeadBeginX()+qn.getNoteHeadEndX())/2;}catch(e){}break;}
       if(nx!=null&&nx>x+18){put(line.replace(/-+$/,''),x);put('-',(x+nx)/2);}else put(line,x);});});
@@ -1131,7 +1146,8 @@ function drawTies(list,sysCtx){
     }catch(e){}
   });
 }
-function drawRecording(){
+function drawRecording(){drawRecording0();try{fitLyrics();}catch(e){}}
+function drawRecording0(){
   scoreVer++;
   // hold the score's height while it is rebuilt, so the page never gets shorter for a moment and jumps
   const el=$('recscore');el.style.minHeight=el.offsetHeight+'px';
@@ -1156,7 +1172,7 @@ function drawScore(el){
   const barClef=b=>b.clef&&b.clef!==part().mainClef&&{alto:1,tenor:1,treble:1,bass:1}[b.clef]?b.clef:scoreClef();   // (only a clef this score can draw)
   const REST_KEY={alto:'c/4',tenor:'a/3',treble:'b/4',treble8:'b/4',bass:'d/3'};
   const labelled=showNames()||showSolfa();
-  const H0=200+(showNames()?16:0)+(showSolfa()?16:0)+(hasWords()?20:0);
+  const H0=200+(showNames()?16:0)+(showSolfa()?16:0)+lyRoom();
   const allNotes=[],all2=[];
   const sysCtx=[];
   const v2g=part().v2&&!rec.on?v2Bars(part()):null;let v2k=0;   // the second voice, bar by bar
@@ -1244,13 +1260,13 @@ function fullColumns(){
   let t=0;lead.forEach(b=>{const d=b.reduce((a,p)=>a+p.d,0);cols.push({bar:b,t0:t,t1:t+d});t+=d;});
   // a part that runs on past the others gets bars of its own at the end
   const end=Math.max(t,...sc.parts.map((p,pi)=>p.items.length?P[pi][p.items.length-1]+p.items[p.items.length-1].d:0)),last=lead[lead.length-1];
-  while(last&&t<end){const b=[];b.key=last.key;b.ts=last.ts;b.clef=last.clef;b.cap=last.cap;cols.push({bar:b,t0:t,t1:t+last.cap});t+=last.cap;}
+  while(last&&t<end-0.05){const b=[];b.key=last.key;b.ts=last.ts;b.clef=last.clef;b.cap=last.cap;cols.push({bar:b,t0:t,t1:t+last.cap});t+=last.cap;}
   cols.forEach(c=>{c.parts=sc.parts.map(()=>[]);c.v2=sc.parts.map(()=>[]);c.clefs=sc.parts.map(()=>null);});
   const find=x=>{let lo=0,hi=cols.length-1;while(lo<hi){const m=(lo+hi+1)>>1;if(cols[m].t0<=x)lo=m;else hi=m-1;}return lo;};
   sc.parts.forEach((pt,pi)=>{
     let clef=null;
     const place=(items,times,key,own)=>items.forEach((it,i)=>{
-      if(own&&it.sec&&it.sec.clef)clef=it.sec.clef;
+      if(own&&it.sec&&it.sec.clef)clef=it.sec.clef;if(own&&it.cl)clef=it.cl;
       let s=times[i],rem=it.d,k=find(s+0.01);const pieces=[];
       while(rem>0.01&&k<cols.length){
         const c=cols[k];if(s<c.t0)s=c.t0;
@@ -1283,7 +1299,7 @@ function drawFullScore(el){
   const drawable={alto:1,tenor:1,treble:1,bass:1};
   const clefOf=(pt,c)=>c&&c!==pt.mainClef&&drawable[c]?c:(pt.clef||st.clef);
   const REST_KEY={alto:'c/4',tenor:'a/3',treble:'b/4',treble8:'b/4',bass:'d/3'};
-  const rowsL=(showNames()?16:0)+(showSolfa()?16:0)+(hasWords()?20:0),gapY=rowsL?106+rowsL:100,H0=50+(NP-1)*gapY+150+rowsL;
+  const rowsL=(showNames()?16:0)+(showSolfa()?16:0)+lyRoom(),gapY=rowsL?106+rowsL:100,H0=50+(NP-1)*gapY+150+rowsL;
   const all=sc.parts.map(()=>[]),allB=sc.parts.map(()=>[]),sysCtx=[];
   sysList.forEach((sys,si)=>{
     const hd=pieceHead(sys.units[0].b),H=H0+hd;   // (room for a piece's title)
