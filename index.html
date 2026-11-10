@@ -183,8 +183,8 @@ span.pname{min-width:0;color:#6e4f28}
   <div class="controls">
     <label>Time <select id="tsn"></select> / <select id="tsd"></select></label>
     <label>Title <input type="text" id="title" placeholder="Untitled" style="width:150px"></label>
-    <label><input type="checkbox" id="namesChk" checked> Note names</label>
-    <label><input type="checkbox" id="solfaChk" checked> Sol-fa (movable do)</label>
+    <label><input type="checkbox" id="namesChk"> Note names</label>
+    <label><input type="checkbox" id="solfaChk"> Sol-fa (movable do)</label>
     <label title="Make the music bigger or smaller">Score size <input type="range" id="zoom" min="0.6" max="1.6" step="0.05" value="1" style="width:110px"></label>
     <label title="Begin each line of music where the printed score began it"><input type="checkbox" id="origChk" checked> Lines as printed</label>
   </div>
@@ -348,12 +348,12 @@ span.pname{min-width:0;color:#6e4f28}
 </div>
 
 <script src="vexflow.js"></script>
-<script src="omr.js?v=2.2"></script>
+<script src="omr.js?v=2.3"></script>
 <script>
 const {Renderer,Stave,StaveNote,Voice,Formatter,Accidental,Dot,Beam,StaveTie,Barline,Volta,GhostNote,StaveConnector,Tuplet,Fraction,Articulation,Curve,GraceNote,GraceNoteGroup,Glyph} = Vex.Flow;
 const $=id=>document.getElementById(id);
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='4.2';
+const APP_VERSION='4.3';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -910,7 +910,7 @@ function decomp(t){const out=[];for(const r of REP){while(t>=r.t){out.push(r.t);
 // the pieces a note is drawn in (a triplet's note is one piece; nd is the length it is written as)
 const pieceDurs=(it,take)=>it.tu?[take]:decomp(Math.round(take));
 function pieceOf(it,d,idx){const q={m:it.m,d,idx};if(it.ch)q.ch=it.ch;if(it.tu){q.tu=it.tu;q.nd=Math.round(d*1.5);}if(it.hid)q.hid=true;if(it.up!=null)q.up=it.up;
-  if(it.sp)q.sp=it.sp;if(it.ly)q.ly=it.ly;if(it.art)q.art=it.art;if(it.dyn)q.dyn=it.dyn;if(it.gr)q.gr=it.gr;if(it.ss)q.ss=it.ss;if(it.se)q.se=it.se;return q;}
+  if(it.sp)q.sp=it.sp;if(it.ly)q.ly=it.ly;if(it.tx)q.tx=it.tx;if(it.hs)q.hs=it.hs;if(it.he)q.he=1;if(it.art)q.art=it.art;if(it.dyn)q.dyn=it.dyn;if(it.gr)q.gr=it.gr;if(it.ss)q.ss=it.ss;if(it.se)q.se=it.se;return q;}
 // the second voice of a part, in the bars printed in the score (one group of pieces for each printed bar)
 function v2Bars(p){const out=[];let g=null;
   (p.v2||[]).forEach(it=>{if(it.bar!=null||!g){g=[];out.push(g);}const ps=pieceDurs(it,it.d).map(d=>pieceOf(it,d,-1));
@@ -1247,10 +1247,19 @@ const hasWords=()=>sc.parts.some(p=>p.items.some(i=>i.ly));
 function drawMarks(ctx,svg,stave,pieces,notes,above){
   const rows=(showNames()?1:0)+(showSolfa()?1:0);
   // the words of a song, under their notes (below the note names when those are shown)
+  let lyDrop=0;if(pieces.some(p=>p.ly))notes.forEach(sn=>{try{if(sn.ghost||!sn.getBoundingBox)return;const b=sn.getBoundingBox(),low=b.getY()+b.getH()-(stave.getYForLine(4)+26);if(low>lyDrop)lyDrop=Math.min(30,low);}catch(e){}});
   pieces.forEach((p,i)=>{const sn=notes[i];if(!p.ly||!sn||sn.ghost||p.tiePrev)return;
     let x;try{x=(sn.getNoteHeadBeginX()+sn.getNoteHeadEndX())/2;}catch(e){return;}
-    p.ly.split('\n').forEach((line,li)=>{const t=document.createElementNS(SVGNS,'text');t.setAttribute('x',x.toFixed(1));t.setAttribute('y',(stave.getYForLine(4)+(rows?52+rows*15:46)+li*16).toFixed(1));
-      t.setAttribute('text-anchor','middle');t.setAttribute('font-family',SCORE_FONT);t.setAttribute('font-size','14');t.setAttribute('fill','#000');t.textContent=line;svg.appendChild(t);});});
+    p.ly.split('\n').forEach((line,li)=>{const y=stave.getYForLine(4)+(rows?52+rows*15:44)+li*17+lyDrop;
+      const put=(s,xx)=>{const t=document.createElementNS(SVGNS,'text');t.setAttribute('x',xx.toFixed(1));t.setAttribute('y',y.toFixed(1));
+        t.setAttribute('text-anchor','middle');t.setAttribute('font-family',SCORE_FONT);t.setAttribute('font-size','16');t.setAttribute('fill','#000');t.textContent=s;svg.appendChild(t);};
+      // a syllable that goes on: its hyphen stands half way to the next syllable, as in print
+      let nx=null;if(/-$/.test(line))for(let k=i+1;k<pieces.length;k++){const q=pieces[k],qn=notes[k];if(!q.ly||!qn||qn.ghost||q.tiePrev)continue;try{nx=(qn.getNoteHeadBeginX()+qn.getNoteHeadEndX())/2;}catch(e){}break;}
+      if(nx!=null&&nx>x+18){put(line.replace(/-+$/,''),x);put('-',(x+nx)/2);}else put(line,x);});});
+  // words over the staff: Andante, rit., a metronome mark
+  pieces.forEach((p,i)=>{const sn=notes[i];if(!p.tx||!sn||p.tiePrev)return;let x;try{x=sn.getAbsoluteX();}catch(e){return;}
+    p.tx.split('\n').reverse().forEach((line,li)=>{const t=document.createElementNS(SVGNS,'text');t.setAttribute('x',Math.max(stave.getX()+4,x-6).toFixed(1));t.setAttribute('y',(stave.getYForLine(0)-(above&&p.dyn?44:30)-li*18).toFixed(1));
+      t.setAttribute('font-family',SCORE_FONT);t.setAttribute('font-size','16');t.setAttribute('font-weight','bold');t.setAttribute('fill','#000');t.textContent=line;svg.appendChild(t);});});
   pieces.forEach((p,i)=>{const sn=notes[i];if(!p.dyn||!sn||sn.ghost||p.tiePrev)return;
   let x;try{x=sn.getAbsoluteX();}catch(e){return;}
   try{omrDrawDyn(Vex.Flow,ctx,null,p.dyn,x-4,above?stave.getYForLine(0)-18:stave.getYForLine(4)+(rows?26:34),rows?24:30);}catch(e){}});}
@@ -1262,10 +1271,46 @@ function tupletsOf(ps,notes){const out=[];let g=[];
 // beams in threes in 6/8, 9/8 and 12/8
 function beamOpt(ts,stem){const o={};if(stem)o.stem_direction=stem;if(ts&&ts[1]===8&&ts[0]%3===0)o.groups=[new Fraction(3,8)];return o;}
 // slurs: from the note that starts one to the note that ends it (when both are on the same line of music)
-function drawSlurs(list,sysCtx){let open=null;
+// A slur never crosses its notes: it goes over the whole group (clear of every head and stem) or under it. Under when
+// every stem of the group points up (the heads are at the bottom); over otherwise. A second voice's slurs go under.
+function drawSlurs(list,sysCtx,under){let open=null,oi=-1;
+  list.forEach((a,i)=>{if(a.sn.ghost)return;
+    if(a.p.se&&open&&open!==a&&!a.p.tieNext){if(open.si===a.si)slurPath(list.slice(oi,i+1).filter(q=>!q.sn.ghost&&q.si===a.si),under);open=null;}
+    if(a.p.ss&&!a.p.tiePrev){open=a;oi=i;}});}
+// hairpins: louder (opening) or softer (closing), from the note they start at to the note they end at
+function drawHairpins(list,above){let open=null;
   list.forEach(a=>{if(a.sn.ghost)return;
-    if(a.p.se&&open&&open!==a&&!a.p.tieNext){if(open.si===a.si){try{new Curve(open.sn,a.sn,{}).setContext(sysCtx[a.si]).draw();}catch(e){}}open=null;}
-    if(a.p.ss&&!a.p.tiePrev)open=a;});}
+    if(a.p.hs&&!a.p.tiePrev)open={a,t:a.p.hs};
+    if(a.p.he&&open&&!a.p.tieNext){if(open.a.si===a.si)hairpin(open.a,a,open.t,above);open=null;}});}
+function hairpin(a,b,t,above){
+  try{
+    let x0=a.sn.getAbsoluteX()+(a.p.dyn?30:-2),x1=b.sn.getAbsoluteX()+14;if(x1-x0<26)x1=x0+26;
+    const st=a.sn.getStave(),y=above?st.getYForLine(0)-24:st.getYForLine(4)+28,h=5;
+    const svg=a.sn.getSVGElement&&a.sn.getSVGElement();const root=svg&&(svg.ownerSVGElement||svg.closest('svg'));if(!root)return;
+    const p=document.createElementNS(SVGNS,'path'),f=v=>v.toFixed(1);
+    p.setAttribute('d',t==='c'?`M${f(x1)} ${f(y-h)} L${f(x0)} ${f(y)} L${f(x1)} ${f(y+h)}`:`M${f(x0)} ${f(y-h)} L${f(x1)} ${f(y)} L${f(x0)} ${f(y+h)}`);
+    p.setAttribute('fill','none');p.setAttribute('stroke','#000');p.setAttribute('stroke-width','1.1');p.setAttribute('class','hairpin');root.appendChild(p);
+  }catch(e){}
+}
+function slurPath(grp,under){
+  try{
+    const bx=grp.map(q=>{const b=q.sn.getBoundingBox(),up=q.sn.getStemDirection&&q.sn.getStemDirection()>0;let x;try{x=(q.sn.getNoteHeadBeginX()+q.sn.getNoteHeadEndX())/2;}catch(e){x=b.getX()+b.getW()/2;}
+      return {x,top:b.getY(),bot:b.getY()+b.getH(),up,rest:q.p.m==null};}).filter(Boolean);
+    if(bx.length<2)return;
+    const below=under===true||(under!==false&&bx.filter(b=>!b.rest).every(b=>b.up));
+    const a=bx[0],z=bx[bx.length-1],len=z.x-a.x;if(len<6)return;
+    const edge=b=>below?b.bot+5:b.top-5,ya=edge(a),yz=edge(z);
+    // how far the middle must bow out to clear every note in between
+    let bow=Math.min(22,6+len*0.06);
+    bx.forEach(b=>{const t=(b.x-a.x)/len,line=ya+(yz-ya)*t,need=below?edge(b)-line:line-edge(b),w=Math.max(0.2,4*t*(1-t));if(need>0)bow=Math.max(bow,need/w*0.75+4);});
+    bow=Math.min(bow,90);
+    const s=below?1:-1,c1x=a.x+len*0.25,c2x=a.x+len*0.75,c1y=ya+(yz-ya)*0.25+s*bow*1.33,c2y=ya+(yz-ya)*0.75+s*bow*1.33,th=2.4;
+    const svg=grp[0].sn.getSVGElement&&grp[0].sn.getSVGElement();const root=svg&&(svg.ownerSVGElement||svg.closest('svg'));if(!root)return;
+    const p=document.createElementNS(SVGNS,'path');
+    p.setAttribute('d',`M${a.x.toFixed(1)} ${ya.toFixed(1)} C${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${z.x.toFixed(1)} ${yz.toFixed(1)} C${c2x.toFixed(1)} ${(c2y+s*th).toFixed(1)} ${c1x.toFixed(1)} ${(c1y+s*th).toFixed(1)} ${a.x.toFixed(1)} ${ya.toFixed(1)}Z`);
+    p.setAttribute('fill','#000');p.setAttribute('class','slur');root.appendChild(p);
+  }catch(e){}
+}
 // ties from one drawn note to the next: every note of a note cut in pieces, or only the notes that carry on (tn)
 function drawTies(list,sysCtx){
   list.forEach((a,i)=>{
@@ -1369,7 +1414,7 @@ function drawScore(el){
     svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.style.width='100%';svg.style.height='auto';
   });
   // ties
-  drawTies(allNotes.filter(a=>!a.sn.ghost),sysCtx);drawTies(all2.filter(a=>!a.sn.ghost),sysCtx);drawSlurs(allNotes,sysCtx);drawSlurs(all2,sysCtx);
+  drawTies(allNotes.filter(a=>!a.sn.ghost),sysCtx);drawTies(all2.filter(a=>!a.sn.ghost),sysCtx);drawSlurs(allNotes,sysCtx,all2.length?false:undefined);drawSlurs(all2,sysCtx,true);drawHairpins(allNotes,dynAbove(part()));
   // click to select
   selEl=null;noteEls=new Map();
   allNotes.forEach(a=>{const e=a.sn.getSVGElement&&a.sn.getSVGElement();if(!e||a.p.idx>=nReal)return;
@@ -1504,7 +1549,7 @@ function drawFullScore(el){
     // the parts' names at the start of every line; the part you are working on is in gold
     sc.parts.forEach((pt,pi)=>{
       const t=document.createElementNS('http://www.w3.org/2000/svg','text');
-      t.setAttribute('x','4');t.setAttribute('y',String(50+hd+pi*gapY+65));t.setAttribute('font-family',SCORE_FONT);t.setAttribute('font-size','15');t.setAttribute('font-style','italic');
+      t.setAttribute('x','4');t.setAttribute('y',String(50+hd+pi*gapY+65));t.setAttribute('font-family',SCORE_FONT);t.setAttribute('font-size','17');
       t.setAttribute('class','pnm');t.dataset.pi=pi;t.style.cursor='pointer';t.textContent=pt.kb==='U'?'Piano':pt.kb==='L'?'':pt.name.replace(/ viol\b/i,'');if(pt.kb==='U')t.setAttribute('y',String(50+hd+pi*gapY+65+gapY/2));
       t.addEventListener('click',()=>usePart(pi));svg.appendChild(t);
     });
@@ -1513,7 +1558,7 @@ function drawFullScore(el){
   });
   markActivePart();
   // ties, part by part
-  all.forEach(list=>{drawTies(list,sysCtx);drawSlurs(list,sysCtx);});allB.forEach(list=>{drawTies(list,sysCtx);drawSlurs(list,sysCtx);});
+  all.forEach((list,pi)=>{drawTies(list,sysCtx);drawSlurs(list,sysCtx,allB[pi].length?false:undefined);drawHairpins(list,dynAbove(sc.parts[pi]));});allB.forEach(list=>{drawTies(list,sysCtx);drawSlurs(list,sysCtx,true);});
   // click a note to select it; a note of another part makes that part the one you work on
   all.forEach((list,pi)=>list.forEach(a=>{const e=a.sn.getSVGElement&&a.sn.getSVGElement();if(!e)return;
     const m=noteElsAll[pi];if(!m.has(a.p.idx))m.set(a.p.idx,[]);m.get(a.p.idx).push(e);
@@ -1888,16 +1933,16 @@ async function renderScan(i,targetW){
   if(scan.kind==='pdf'){
     const pg=await scan.pdf.getPage(i+1),v1=pg.getViewport({scale:1}),v=pg.getViewport({scale:targetW/v1.width});
     c.width=Math.round(v.width);c.height=Math.round(v.height);
-    const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
+    const x=c.getContext('2d',{willReadFrequently:true});   // (drawn in memory, not on the graphics card: thin lines come out the same on every device)x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
     await pg.render({canvasContext:x,viewport:v,intent:'print'}).promise;   // 'print' does not wait for screen refreshes, so hidden tabs work too
   }else{
     const img=scan.imgs[i];c.width=targetW;c.height=Math.round(targetW*img.height/img.width);
-    const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.imageSmoothingQuality='high';x.drawImage(img,0,0,c.width,c.height);
+    const x=c.getContext('2d',{willReadFrequently:true});   // (drawn in memory, not on the graphics card: thin lines come out the same on every device)x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.imageSmoothingQuality='high';x.drawImage(img,0,0,c.width,c.height);
   }
   // scans are often a little crooked: straighten the staff lines first
   const sk=estimateSkew(c.getContext('2d',{willReadFrequently:true}).getImageData(0,0,c.width,c.height));
   if(Math.abs(sk)>0.0015){
-    const r=document.createElement('canvas');r.width=c.width;r.height=c.height;const rc=r.getContext('2d');
+    const r=document.createElement('canvas');r.width=c.width;r.height=c.height;const rc=r.getContext('2d',{willReadFrequently:true});
     rc.fillStyle='#fff';rc.fillRect(0,0,r.width,r.height);rc.translate(r.width/2,r.height/2);rc.rotate(-sk);rc.imageSmoothingQuality='high';rc.drawImage(c,-c.width/2,-c.height/2);freeCanvas(c);c=r;
   }
   return c;
@@ -2034,6 +2079,7 @@ function addScannedPoly(all,pages,override){
     else if(pl.kb){name=pl.kb==='U'?'Piano right hand':'Piano left hand';sound='piano';}
     else if(hasKb){name=nv>1?'Voice '+(k+1):'Voice';sound=(PART_OF[cl]||[0,'viola'])[1];}
     else [name,sound]=PART_OF[cl]||['Part '+(k+1),'viola'];
+    if(!pl.kb){const lb=live.flatMap(pg=>pg.staves).find(s=>s.part===k&&s.label&&s.label.length>2);if(lb)name=lb.label;}
     return {name,clef:cl==='alto'||cl==='tenor'?null:cl,mainClef:cl,sound,pan:pl.kb||nv<2?0:+(-0.5+k/(nv-1)).toFixed(2),items:res.parts[k].items,v2:res.parts[k].v2,kb:pl.kb&&!twoTreble?pl.kb:null,br:pl.kb&&twoTreble?pl.kb:null};});
   made.forEach(m=>{const same=made.filter(x=>x.name===m.name);if(same.length>1)m.name+=' '+(same.indexOf(m)+1);});
   const fresh=sc.parts.every(p=>!p.items.length)||confirm(`Replace the notes you have with the ${made.length} parts read from the score?\n\nOK replaces them. Cancel adds each part to the end of the part in the same place.`);
@@ -2577,17 +2623,17 @@ const adviceBox=$('advice');
 try{const b=JSON.parse(localStorage.getItem('score-conv-advice'));if(Array.isArray(b)&&b.length)ADVICE=b.map(x=>String(x).slice(0,200));}catch(e){}
 function adviceSave(){try{localStorage.setItem('score-conv-advice',JSON.stringify(ADVICE));}catch(e){}}
 function adviceShow(){$('adviceTxt').textContent=ADVICE[adviceI%ADVICE.length]||'';}
-function adviceStart(){adviceBox.classList.remove('hide');if(adviceT)return;adviceShow();adviceT=setInterval(()=>{if($('score-conv-advice').style.display==='none'){adviceI++;adviceShow();}},adviceSecs*1000);}
+function adviceStart(){adviceBox.classList.remove('hide');if(adviceT)return;adviceShow();adviceT=setInterval(()=>{if($('adviceBank').style.display==='none'){adviceI++;adviceShow();}},adviceSecs*1000);}
 function adviceStop(){}   // the advice keeps cycling whether or not the music is playing
 {const S=$('adviceSec');if(![...S.options].some(o=>+o.value===adviceSecs)){const o=document.createElement('option');o.value=adviceSecs;o.textContent=adviceSecs+'s';S.append(o);}S.value=adviceSecs;
 S.onchange=()=>{adviceSecs=+S.value;try{localStorage.setItem('adviceSecs',adviceSecs);}catch(e){}clearInterval(adviceT);adviceT=null;adviceStart();};}
 $('adviceX').onclick=()=>adviceBox.classList.add('hide');
 $('adviceAdd').onclick=()=>{const v=$('adviceNew').value.trim();if(!v)return;ADVICE.push(v.slice(0,200));adviceSave();$('adviceNew').value='';adviceI=ADVICE.length-1;adviceShow();};
 $('adviceNew').onkeydown=e=>{if(e.key==='Enter')$('adviceAdd').onclick();e.stopPropagation();};
-$('adviceEdit').onclick=()=>{const T=$('score-conv-advice'),editing=T.style.display!=='none';
+$('adviceEdit').onclick=()=>{const T=$('adviceBank'),editing=T.style.display!=='none';
   if(editing){const l=T.value.split('\n').map(x=>x.trim().slice(0,200)).filter(Boolean);ADVICE=l.length?l:ADVICE_DEFAULT.slice();adviceSave();T.style.display='none';$('adviceTxt').style.display='';$('adviceEdit').textContent='Edit bank';adviceI=0;adviceShow();}
   else{T.value=ADVICE.join('\n');T.style.display='';$('adviceTxt').style.display='none';$('adviceEdit').textContent='Save bank';T.focus();}};
-$('score-conv-advice').onkeydown=e=>e.stopPropagation();
+$('adviceBank').onkeydown=e=>e.stopPropagation();
 // drag by the title; remember position and size
 (function(){const H=$('adviceHead');let d=null;
   const keep=()=>{try{const r=adviceBox.getBoundingClientRect();localStorage.setItem('advicePos',JSON.stringify({l:r.left,t:r.top,w:r.width,h:r.height}));}catch(e){}};
