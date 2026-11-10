@@ -4,346 +4,149 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Score Converter</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=UnifrakturMaguntia&display=swap">
 <style>
-:root{--bg:#1b120b;--panel:#24170c;--ink:#efdfba;--dim:#c4aa7a;--gold:#d4a73a;--gold2:#f2d27a;--ok:#7fc77f;--bad:#ec6a5e;--wood:#7a4a26;
-  --parch:#f2e6c6;--inkd:#2a190c;--rub:#8e1b12;--edge:#6b4a22;
-  --ui:'IM Fell English',Georgia,serif;--caps:'IM Fell English SC','IM Fell English',Georgia,serif;--black:'UnifrakturMaguntia','IM Fell English SC',Georgia,serif}
+:root{--bg:#eef1f5;--bar:#1e293b;--ink:#0f172a;--dim:#64748b;--line:#cbd5e1;--acc:#2563eb;--acc2:#1d4ed8;--panel:#ffffff;--ok:#15803d;--bad:#b91c1c;
+  --gold:#2563eb;--rub:#2563eb;--inkd:#0f172a;--ui:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif}
 *{box-sizing:border-box}
 html,body{height:100%}
-/* One screen: the toolbar, any open menu and the necks keep their size; the score takes the rest and scrolls inside.
-   The look: a dark oak desk, leaves of parchment for the menus, gilding, and the score as a printed sheet. */
-body{margin:0;color:var(--ink);font:16px/1.45 var(--ui);display:flex;flex-direction:column;gap:6px;height:100vh;height:100dvh;overflow:hidden;padding:6px 10px 8px;
-  background-color:var(--bg);background-image:repeating-linear-gradient(91deg,rgba(255,214,150,.035) 0 1px,transparent 1px 7px),repeating-linear-gradient(89deg,rgba(0,0,0,.22) 0 2px,transparent 2px 31px),linear-gradient(180deg,#3a2414,#1b120b 55%,#140d07)}
-#topbar{flex:none;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:0 2px 7px;border-bottom:3px double var(--gold)}
-#topbar .appname{font-family:var(--black);color:var(--gold2);font-size:28px;line-height:1;text-shadow:0 2px 0 #000,0 0 10px rgba(212,167,58,.4)}
-#ver{font-size:12px;color:var(--dim);font-style:italic}
-.controls{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
-#topbar label,.controls label{display:flex;gap:5px;align-items:center;font-size:15px;color:var(--dim)}
-select,button,input[type=number],input[type=text]{touch-action:manipulation;font:15px var(--caps);color:var(--inkd);background:linear-gradient(#f7ecd2,#dcc595);border:1px solid #4e3416;border-radius:4px;padding:5px 10px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 0 -2px 3px rgba(120,80,30,.28),0 1px 2px rgba(0,0,0,.65)}
+/* One screen: the toolbar and any open menu keep their size; the score takes the rest and scrolls inside. */
+body{margin:0;color:var(--ink);font:15px/1.4 var(--ui);display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;background:var(--bg)}
+#topbar{flex:none;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:8px 14px;background:var(--bar);color:#e2e8f0}
+#topbar .appname{font-weight:700;font-size:19px;letter-spacing:.01em;color:#fff;margin-right:2px}
+#ver{font-size:12px;color:#94a3b8}
+.controls{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+#topbar label{display:flex;gap:6px;align-items:center;font-size:14px;color:#cbd5e1}
+.controls label{display:flex;gap:6px;align-items:center;font-size:14px;color:#334155}
+select,button,input[type=number],input[type=text]{touch-action:manipulation;font:14px var(--ui);color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:6px;padding:6px 11px}
 select,button{cursor:pointer}
-input[type=number],input[type=text]{font-family:var(--ui);padding:4px 8px}
-button:hover,select:hover{background:linear-gradient(#fcf3de,#e7d2a6)}
-button:active{box-shadow:inset 0 2px 5px rgba(70,40,10,.5)}
-button.on,button.fold.open{background:linear-gradient(#fff0b0,#e2b748 45%,#b6871f);border-color:#5a3d08;color:var(--inkd);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 0 9px rgba(242,210,122,.5),0 1px 2px rgba(0,0,0,.65)}
-#playBtn,button.rec{background:linear-gradient(#b93a2e,#741a11);color:#fbefd2;border-color:#3a0a05;text-shadow:0 1px 0 #3a0a05}
-#playBtn:hover,button.rec:hover{background:linear-gradient(#c94b3e,#842015)}
-button.rec.live{background:#e0302a;animation:pulse 1s infinite}
-@keyframes pulse{50%{opacity:.55}}
-input[type=range],input[type=checkbox]{accent-color:var(--rub)}
+input[type=number],input[type=text]{padding:5px 8px}
+button:hover,select:hover{background:#f1f5f9}
+button:active{background:#e2e8f0}
+button.on,button.fold.open{background:#dbeafe;border-color:var(--acc);color:var(--acc2)}
+#playBtn,button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+#playBtn:hover,button.primary:hover{background:var(--acc2)}
+#playBtn{min-width:86px}
+input[type=range],input[type=checkbox]{accent-color:var(--acc)}
 @media (pointer:coarse){button,select{min-height:44px;padding:8px 12px}}
-/* the menus: leaves of parchment */
-.foldp{flex:none;display:none;color:var(--inkd);background-color:var(--parch);
-  background-image:radial-gradient(ellipse at 15% 0%,rgba(255,255,255,.55),transparent 55%),radial-gradient(ellipse at 100% 100%,rgba(150,100,35,.25),transparent 60%),radial-gradient(ellipse at 0% 100%,rgba(150,100,35,.18),transparent 50%);
-  border:1px solid var(--edge);border-radius:3px;box-shadow:inset 0 0 0 3px var(--parch),inset 0 0 0 4px #a8834a,inset 0 0 26px rgba(140,90,30,.28),0 4px 10px rgba(0,0,0,.65);padding:10px 14px;max-height:46vh;overflow:auto}
+.foldp{flex:none;display:none;background:var(--panel);border-bottom:1px solid var(--line);padding:10px 14px;max-height:46vh;overflow:auto}
 .foldp.open{display:block}
 .foldp .controls+.controls{margin-top:8px}
-.foldp label,.foldp .controls label{color:#4a2c12}
-.foldp .score,.foldp small{color:#6e4f28}
-.foldp h3{font:normal 23px var(--caps);color:var(--rub);margin:2px 0 8px}
-.foldp a{color:var(--rub)}
-.foldp p b{color:var(--rub);font-weight:normal;font-family:var(--caps)}
-/* the necks, on dark wood */
-#neckWrap{flex:none;display:grid;gap:2px 10px;padding:3px 8px 4px;border-radius:4px;background:linear-gradient(#26180c,#170e06);border:1px solid var(--edge);box-shadow:inset 0 0 0 1px #000,inset 0 3px 12px rgba(0,0,0,.75),0 2px 6px rgba(0,0,0,.5)}
-#neckWrap .neck{min-width:0}
-/* the label above each neck: its name in the viol's colour, and its tuning */
-#neckWrap .nlab{height:20px;line-height:20px;font:16px var(--caps);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px}
-#neckWrap .nlab b{font-weight:normal}
-#neckWrap .nlab .tun{color:var(--dim);font:italic 13px var(--ui);margin-left:8px}
-/* each neck is its wood (drawn once) with its notes over it (drawn as they light up) */
-#neckWrap .nsvg{position:relative}
-#neckWrap .nboard svg{width:100%;height:auto;display:block}
-#neckWrap .ndots{position:absolute;inset:0;pointer-events:none}
-#neckWrap .ndots svg{width:100%;height:100%;display:block}
-#neckWrap .ndots .dot{pointer-events:auto}
-.dot{cursor:pointer}
-.dot circle{transition:fill .1s}
-.dot:hover circle:not(.rg){stroke:var(--gold);stroke-width:3}
-/* a note that lights up on a neck pops out a little each time it is played */
-.dot.lit .main{animation:pop .3s ease-out;transform-box:fill-box;transform-origin:center}
-@keyframes pop{from{transform:scale(1.45)}to{transform:scale(1)}}
-#neckWrap,#recscore{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-#statusLine{flex:none;display:flex;gap:14px;align-items:baseline;min-height:22px;overflow:hidden}
-#msg{font-size:16px;white-space:nowrap;font-style:italic}
+.foldp .hint{color:var(--dim);font-size:13px;margin-top:8px}
+.score{color:var(--dim);font-size:13px}
+#statusLine{flex:none;display:flex;gap:14px;align-items:baseline;min-height:26px;overflow:hidden;padding:4px 14px}
 #recstat{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* the bar between the necks and the score: drag it to share out the room */
-#splitBar{flex:none;height:14px;margin:-4px 0;display:flex;align-items:center;justify-content:center;cursor:row-resize;touch-action:none}
-#splitBar span{width:120px;height:5px;border-radius:3px;background:linear-gradient(90deg,transparent,#8a6a2a 15%,var(--gold2) 50%,#8a6a2a 85%,transparent)}
-#splitBar:hover span,#splitBar.drag span{background:linear-gradient(90deg,transparent,var(--gold) 10%,#fff2c0 50%,var(--gold) 90%,transparent)}
-@media (pointer:coarse){#splitBar{height:24px;margin:-6px 0}#splitBar span{width:140px;height:6px}}
-/* the score: a printed sheet in a gilt frame */
-#scoreBox{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#fff;border-radius:2px;border:1px solid #000;box-shadow:0 0 0 3px #4e3416,0 0 0 4px var(--gold),0 5px 16px rgba(0,0,0,.75)}
-#staff{touch-action:none;-webkit-user-select:none;user-select:none;background:#fff;border:1px solid #a8834a;border-radius:2px;min-height:200px}
-.ok{color:var(--ok)}.bad{color:var(--bad)}
-.names{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
-.names button{min-width:44px;font-size:18px}
-/* rote: while a drill runs, a strip under the neck holds the question, the mark, Finish and the twelve note names */
-#roteBar{flex:none;color:var(--inkd);background:var(--parch);border:1px solid var(--edge);border-radius:3px;box-shadow:inset 0 0 0 2px var(--parch),inset 0 0 0 3px #a8834a,0 3px 8px rgba(0,0,0,.6);padding:6px 12px 8px}
-.rote-ask{display:flex;align-items:center;gap:6px 16px;flex-wrap:wrap}
-#roteAsk{font:bold 40px 'Times New Roman',Times,serif;color:var(--rub);min-width:52px;line-height:1.1}
-#roteHow{font-size:16px;color:#4a2c12;flex:1;min-width:180px}
-#roteScore{font-size:16px;color:#4a2c12;white-space:nowrap}
-#roteStaff{flex:none;background:#fff;border:1px solid #a8834a;border-radius:2px;line-height:0}
-#roteStaff svg{display:block}
-#roteStaff.tap{cursor:crosshair}
-#roteAcc button{min-width:44px;font-size:20px}
-#roteMove button{min-width:52px;font-size:17px}
-.rote-names{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin-top:6px}
-.rote-names button{font-size:19px;padding:8px 4px}
-.score{color:var(--dim);font-size:14px}
-table{border-collapse:collapse;font-size:15px}
-td,th{border-bottom:1px solid #b89a62;padding:3px 10px;text-align:left}
-th{font:normal 15px var(--caps);color:var(--rub)}
-small{color:var(--dim)}
-a{color:var(--gold)}
-#recscore{padding:6px;min-height:80px;color:#000}
-#recscore .ph{color:#6e5a3a;padding:24px;text-align:center;font:italic 17px var(--ui)}
+#scoreBox{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#fff;margin:0 14px 12px;border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 3px rgba(15,23,42,.08)}
+#recscore{padding:6px;min-height:80px;color:#000;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#recscore .ph{color:var(--dim);padding:70px 24px;text-align:center;font-size:17px;line-height:1.6}
+#recscore .ph b{display:block;color:var(--ink);font-size:22px;margin-bottom:6px}
 #recscore .playmark{mix-blend-mode:multiply;opacity:.85}   /* the highlighter behind the note that is playing */
 #rectitle{display:none}
+body.drag #scoreBox{outline:3px dashed var(--acc);outline-offset:-6px}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
 #partsBar{display:flex;flex-direction:column;gap:4px}
-.prow{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;padding:4px 8px;border:1px solid #b08d55;border-radius:3px;background:rgba(255,250,235,.35)}
-.prow.on{border-color:var(--rub);background:rgba(255,244,214,.8);box-shadow:inset 3px 0 0 var(--rub)}
+.prow{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;padding:4px 8px;border:1px solid var(--line);border-radius:6px}
+.prow.on{border-color:var(--acc);background:#eff6ff}
 .prow .pname{min-width:150px;text-align:left}
-span.pname{min-width:0;color:#6e4f28}
+span.pname{min-width:0;color:var(--dim)}
 .prow .ms{min-width:40px}
-.prow .ms.mute.on{background:linear-gradient(#c0463c,#7f1d14);border-color:#3a0a05;color:#fff}
-.prow .ms.solo.on{background:linear-gradient(#fff0b0,#e2b748 45%,#b6871f);border-color:#5a3d08;color:var(--inkd)}
+.prow .ms.mute.on{background:#dc2626;border-color:#b91c1c;color:#fff}
+.prow .ms.solo.on{background:#f59e0b;border-color:#d97706;color:#fff}
 .prow input[type=range]{width:110px}
 .grp{display:inline-flex;gap:4px;flex-wrap:wrap}
-.pal .gl{font-size:20px;line-height:1;font-family:'Segoe UI Symbol','Noto Music',serif}
-/* reading printed music: a leaf over everything else */
-#pdfref{position:fixed;inset:8px;z-index:30;color:var(--inkd);background:var(--parch);border:1px solid var(--edge);border-radius:3px;box-shadow:inset 0 0 0 3px var(--parch),inset 0 0 0 4px #a8834a,0 6px 24px rgba(0,0,0,.8);padding:12px;display:none;flex-direction:column;gap:6px}
+.pal .gl{font-size:19px;line-height:1;font-family:'Segoe UI Symbol','Noto Music',serif}
+/* reading printed music: a sheet over everything else */
+#pdfref{position:fixed;inset:10px;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 40px rgba(15,23,42,.35);padding:12px;display:none;flex-direction:column;gap:6px}
 #pdfref.open{display:flex}
-#pdfref b{color:var(--rub)!important;font:normal 18px var(--caps)}
-#pdfref .score,#pdfref label{color:#5a3d1c}
-#scView{flex:1;min-height:0;overflow:auto;border:1px solid var(--edge);border-radius:2px;background:#fff}
+#pdfref b{color:var(--ink)!important;font-size:16px}
+#scView{flex:1;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:6px;background:#fff}
 @media print{
   html,body{height:auto}
   body{display:block;overflow:visible;background:#fff;color:#000;padding:0}
-  #topbar,.foldp,#neckWrap,#statusLine,#splitBar,#pdfref{display:none!important}
-  #scoreBox{overflow:visible;background:#fff;border:0;border-radius:0;box-shadow:none}
+  #topbar,.foldp,#statusLine,#pdfref{display:none!important}
+  #scoreBox{overflow:visible;background:#fff;border:0;border-radius:0;box-shadow:none;margin:0}
   #rectitle{display:block;margin:0 0 8px;font:22px 'Times New Roman',Times,serif;color:#000}
   #recscore{padding:0}
   .playmark{display:none}
 }
-#advice{position:fixed;right:12px;bottom:12px;z-index:40;width:300px;height:190px;min-width:200px;min-height:120px;max-width:96vw;max-height:96vh;resize:both;overflow:hidden;box-sizing:border-box;display:flex;flex-direction:column;gap:4px;color:var(--inkd);background:var(--parch);border:1px solid var(--edge);border-radius:3px;box-shadow:inset 0 0 0 3px var(--parch),inset 0 0 0 4px #a8834a,0 6px 24px rgba(0,0,0,.8);padding:6px 12px 8px}
-#advice.hide{display:none}
-#advice h4{margin:0;padding:2px 22px 2px 0;font-size:13px;letter-spacing:.06em;text-transform:uppercase;opacity:.7;cursor:move;user-select:none;touch-action:none}
-#advice #adviceTxt{flex:1;overflow:auto;font-size:19px;line-height:1.3}
-#advice #adviceX{position:absolute;top:2px;right:6px;border:0;background:none;font-size:18px;cursor:pointer;color:inherit}
-#advice .arow{display:flex;gap:4px;flex:none}
-#advice .arow input{flex:1;min-width:0}
-#advice #adviceBank{flex:1;min-height:60px;width:100%;box-sizing:border-box;resize:none;font:14px/1.3 var(--ui)}
 </style>
 </head>
 <body>
 <div id="topbar">
-  <span class="appname">❦ Score Converter</span><span id="ver"></span>
+  <span class="appname">Score Converter</span><span id="ver"></span>
+  <button id="impBtn" class="primary" title="Printed music as a PDF or a picture, or a MusicXML, MIDI or saved score file">Open score…</button>
   <button id="playBtn">▶ Play</button>
-  <button id="followBtn" class="on" title="Go to the music that is playing and keep it in view (scrolling by hand pauses it)">Follow score</button>
-  <label>From <select id="fromSel" style="max-width:220px"></select></label>
+  <label title="Crotchet beats in a minute">Tempo <input type="number" id="bpm" value="60" min="30" max="240" style="width:64px"></label>
+  <label>From <select id="fromSel" style="max-width:200px"></select></label>
   <label>Bar <input type="number" id="fromBar" min="1" placeholder="–" style="width:58px"></label>
-  <label>Tempo <input type="number" id="bpm" value="60" min="30" max="240" style="width:62px"></label>
+  <button id="followBtn" class="on" title="Keep the music that is playing in view (scrolling by hand pauses it)">Follow</button>
   <label id="partPick" style="display:none">Part <select id="partSel"></select></label>
   <button id="fullBtn" style="display:none" title="Show every part's staff together, or only the part you are working on">All parts</button>
-  <label id="neckPick" style="display:none" title="The part whose notes light up on the neck while the music plays">Neck shows <select id="neckSel"></select></label>
   <span style="flex:1"></span>
-  <button id="wipeBtn" title="Delete everything in the white score (asks first)">🗑 Clear score</button>
-  <button class="fold" data-p="pPrac" title="Exercises: open strings, scales, arpeggios">Practise ▾</button>
-  <button class="fold" data-p="pRote" title="Drills with a mark: find named notes on the neck, and name notes shown on it">Rote ▾</button>
-  <button class="fold" data-p="pNotes" title="Rhythms, dots, rests and editing">Notes ▾</button>
+  <button class="fold" data-p="pNotes" title="Change notes, rhythms, key, time and title">Edit ▾</button>
   <button class="fold" data-p="pParts" title="Mute, solo, volume, pan and sound of each part">Parts ▾</button>
-  <button class="fold" data-p="pFile" title="Open, save, print, record">File ▾</button>
-  <button class="fold" data-p="pSet" title="The necks shown, clef, key, and the quizzes">Settings ▾</button>
-  <button class="fold" data-p="pAbout">About ▾</button>
+  <button class="fold" data-p="pFile" title="Save the score, or export it as MIDI, MusicXML or PDF">Save ▾</button>
+  <button id="wipeBtn" title="Delete everything in the score (asks first)">Clear</button>
+  <input type="file" id="impFile" accept=".json,.mid,.midi,.musicxml,.xml,.pdf,image/*" style="display:none">
 </div>
 
 <div class="foldp pal" id="pNotes">
+  <div class="controls">
+    <button id="prevBtn" title="Previous note (left arrow)">◀ Note</button>
+    <button id="nextBtn" title="Next note (right arrow)">Note ▶</button>
+    <span class="grp"><button id="pUpBtn" title="Up a step in the key (up arrow)">Pitch ▲</button><button id="pDnBtn" title="Down a step in the key (down arrow)">Pitch ▼</button>
+      <button id="pShBtn" title="Up a semitone (Shift + up arrow)">♯</button><button id="pFlBtn" title="Down a semitone (Shift + down arrow)">♭</button>
+      <button id="pOuBtn" title="Up an octave">8va ▲</button><button id="pOdBtn" title="Down an octave">8va ▼</button></span>
+    <button id="delBtn" title="Delete the selected note (Delete)">Delete note</button>
+    <button id="undoBtn" title="Ctrl+Z">↶ Undo</button>
+  </div>
   <div class="controls">
     <span class="score">Rhythm:</span>
     <span id="durBtns" class="grp"></span>
     <span class="score">Dots:</span>
     <span id="dotBtns" class="grp"></span>
-    <button id="restBtn" title="Add a rest of the chosen length (R)">Add rest</button>
-    <label><input type="checkbox" id="entryChk" checked> Neck clicks enter notes</label>
   </div>
   <div class="controls">
-    <button id="prevBtn" title="Previous note (left arrow)">◀ Note</button>
-    <button id="nextBtn" title="Next note (right arrow)">Note ▶</button>
-    <button id="upBtn" title="Longer rhythm (up arrow)">▲ Rhythm</button>
-    <button id="downBtn" title="Shorter rhythm (down arrow)">▼ Rhythm</button>
-    <button id="undoBtn">↶ Undo</button>
-    <button id="delBtn" title="Delete the selected note, or the last one entered (Backspace)">Delete note</button>
+    <span class="score">Add after the selected note:</span>
+    <span id="letBtns" class="grp"></span>
+    <button id="restBtn" title="Add a rest of the chosen length (R)">Rest</button>
     <button id="endBtn" title="Go back to adding notes at the end">Add at end</button>
-    <button id="clearBtn">Clear all</button>
   </div>
   <div class="controls">
+    <label>Title <input type="text" id="title" placeholder="Untitled" style="width:190px"></label>
+    <label>Key <select id="key"></select></label>
     <label>Time <select id="tsn"></select> / <select id="tsd"></select></label>
-    <label>Title <input type="text" id="title" placeholder="Untitled" style="width:150px"></label>
-    <label><input type="checkbox" id="namesChk"> Note names</label>
-    <label><input type="checkbox" id="solfaChk"> Sol-fa (movable do)</label>
-    <label title="Make the music bigger or smaller">Score size <input type="range" id="zoom" min="0.6" max="1.6" step="0.05" value="1" style="width:110px"></label>
+    <label title="Make the music bigger or smaller">Size <input type="range" id="zoom" min="0.6" max="1.6" step="0.05" value="1" style="width:110px"></label>
     <label title="Begin each line of music where the printed score began it"><input type="checkbox" id="origChk" checked> Lines as printed</label>
   </div>
-</div>
-
-<div class="foldp" id="pPrac">
-  <div class="controls">
-    <label>Exercise <select id="exKind">
-      <option value="open">Open strings</option>
-      <option value="major">Major scale</option>
-      <option value="minor">Natural minor scale</option>
-      <option value="harm">Harmonic minor scale</option>
-      <option value="mel">Melodic minor scale</option>
-      <option value="chrom">Chromatic scale</option>
-      <option value="arpMaj">Major arpeggio</option>
-      <option value="arpMin">Minor arpeggio</option>
-      <option value="thirds">Major scale in thirds</option>
-      <option value="frets">Each string, frets 0 to 4 and back</option>
-      <option value="cross">String crossing, neighbouring open strings</option>
-      <option value="lowStep">Low notes: step down from the staff and back</option>
-      <option value="lowLeap">Low notes: leaps from the bottom line</option>
-      <option value="lowLines">Low notes: the ledger lines, then the spaces</option>
-      <option value="lowOct">Low notes: a note on the staff, then its octave below</option>
-      <option value="highStep">High notes: step up from the staff and back</option>
-      <option value="highLeap">High notes: leaps from the top line</option>
-      <option value="highLines">High notes: the ledger lines, then the spaces</option>
-      <option value="highOct">High notes: a note on the staff, then its octave above</option>
-    </select></label>
-    <label>Starting on <select id="exStart"></select></label>
-    <label>Octaves <select id="exOct"><option value="1">1</option><option value="2" selected>2</option></select></label>
-    <label>Notes as <select id="exDur"><option value="64">semibreves</option><option value="32">minims</option><option value="16" selected>crotchets</option><option value="8">quavers</option></select></label>
-    <button id="exGo">Put it in the score</button>
-  </div>
-  <div class="score" id="exInfo" style="margin-top:6px"></div>
-</div>
-
-<div class="foldp" id="pRote">
-  <div class="controls">
-    <label>Drill <select id="roteKind">
-      <option value="find">Name shown: tap it on the neck</option>
-      <option value="name">Note on the neck: press its name</option>
-      <option value="nstaff">Note on the neck: put it on the staff</option>
-      <option value="sfind">Note on the staff: tap it on the neck</option>
-      <option value="sname">Note on the staff: press its name</option>
-      <option value="line">Line on the staff: play it on the neck</option>
-      <option value="same">Same note, another place on the neck</option>
-    </select></label>
-    <label>Viol <select id="roteViol"><option value="treble">Treble</option><option value="tenor" selected>Tenor</option><option value="bass">Bass</option></select></label>
-    <label id="roteOctL">Names <select id="roteOct"><option value="0">any octave (F♯)</option><option value="1">with the octave (F♯3)</option></select></label>
-    <label>Strings <select id="roteStr"></select></label>
-    <label>Notes <select id="roteRange"><option value="all">all</option><option value="low">low, below the staff</option><option value="high">high, above the staff</option><option value="ledger">low and high</option><option value="staff">on the staff</option></select></label>
-    <label>Round <select id="roteLen"><option value="0">until Finish</option><option value="60">1 minute</option><option value="120">2 minutes</option><option value="300">5 minutes</option></select></label>
-    <button id="roteGo">Start</button>
-  </div>
-  <div id="roteInfo" style="margin-top:6px"></div>
-  <div class="score" id="roteMsg" style="margin-top:4px">The drill runs under the neck: the question, your mark, Finish, and the note names to press. Short rounds every day work best; a timed round shows how fast you are getting.</div>
-  <div id="roteRec"><h3>Record</h3><div id="roteLog"></div><button id="roteClear" style="margin-top:8px">Delete the record</button></div>
+  <div class="hint">Click a note in the score to select it. Arrows left and right move between notes, up and down change its pitch, 1 to 6 set its rhythm, the letters A to G add a note, R adds a rest.</div>
 </div>
 
 <div class="foldp" id="pParts"><div id="partsBar"></div></div>
 
 <div class="foldp" id="pFile">
   <div class="controls">
-    <button id="impBtn" title="JSON, MIDI, MusicXML, or printed music as a PDF or picture">Import file / PDF…</button>
-    <button id="expBtn">Export .json</button>
+    <button id="expBtn" class="primary" title="Everything, to open again here later">Save score</button>
     <button id="midBtn" title="A MIDI file, for a sequencer or another music program">Export MIDI</button>
     <button id="xmlBtn" title="A MusicXML file, for MuseScore, Sibelius, Dorico, Finale ...">Export MusicXML</button>
-    <button id="pdfBtn">Save as PDF</button>
-    <button class="rec" id="recBtn">● Record (mic)</button>
-    <input type="file" id="impFile" accept=".json,.mid,.midi,.musicxml,.xml,.pdf,image/*" style="display:none">
+    <button id="pdfBtn" title="Opens the print dialog: choose Save as PDF">Export PDF</button>
   </div>
+  <div class="hint">The score is also kept on this device, so it is still here when you come back.</div>
 </div>
 
-<div class="foldp" id="pSet">
-  <div class="controls">
-    <span class="score">Necks shown:</span>
-    <label title="Tuned D G C E A D (D3 to D5)"><input type="checkbox" class="neckChk" value="treble"> Treble viol</label>
-    <label title="Tuned G C F A D G (G2 to G4)"><input type="checkbox" class="neckChk" value="tenor" checked> Tenor viol</label>
-    <label title="Tuned D G C E A D (D2 to D4)"><input type="checkbox" class="neckChk" value="bass"> Bass viol</label>
-    <span class="score" id="neckHint"></span>
-    <label title="How your tenor viol is tuned: the tenor neck, the drills and the exercises follow it">Tenor viol tuned <select id="tuneSel"><option value="G">G C F A D G (the usual)</option><option value="E">E A D F♯ B E, notes where they sound</option><option value="Ew">E A D F♯ B E, with G fingering (part a minor third higher)</option></select></label>
-    <label title="Where a note lights up on the neck">Notes shown <select id="placeSel"><option value="all">low and high (every place)</option><option value="low">low, open strings first</option><option value="high">high on the neck</option></select></label>
-  </div>
-  <div class="controls">
-    <label>Mode
-      <select id="mode">
-        <option value="explore">Explore (click the neck)</option>
-        <option value="s2n">Quiz: staff → find it on the neck</option>
-        <option value="n2name">Quiz: neck position → name the note</option>
-        <option value="s2name">Quiz: staff → name the note</option>
-      </select></label>
-    <label>Clef
-      <select id="clef">
-        <option value="alto">Alto clef (C3) – usual tenor viol</option>
-        <option value="tenor">Tenor clef (C4)</option>
-        <option value="treble8">Octave treble (G 8vb)</option>
-        <option value="treble">Treble, at pitch</option>
-        <option value="bass">Bass clef</option>
-      </select></label>
-    <label>Key
-      <select id="key"></select></label>
-    <label>Notes
-      <select id="acc">
-        <option value="all">All 12 notes</option>
-        <option value="diatonic">Only notes in the key</option>
-      </select></label>
-    <label>Frets 0–<select id="frets"></select></label>
-    <label><input type="checkbox" id="lbl" checked> Note names on neck</label>
-    <label><input type="checkbox" id="snd" checked> Sound</label>
-    <button id="open">Open strings</button>
-  </div>
-  <div id="staff" style="margin-top:8px"></div>
-  <div id="quizui" style="display:none">
-    <div class="names" id="letters"></div>
-    <div class="names" id="accs"></div>
-    <button id="next" style="display:none">Next ▸ (Enter)</button>
-  </div>
-  <div class="score" id="score"></div>
-</div>
-
-<div class="foldp" id="pAbout">
-  <h3 style="margin-top:0;color:var(--gold)">About the tenor viol</h3>
-  <table>
-    <tr><th>String</th><th>Pitch</th><th>On the alto-clef staff</th></tr>
-    <tr><td>1 (highest)</td><td>G4</td><td>top line</td></tr>
-    <tr><td>2</td><td>D4</td><td>space between lines 3 and 4</td></tr>
-    <tr><td>3</td><td>A3</td><td>second line from the bottom</td></tr>
-    <tr><td>4</td><td>F3</td><td>bottom line</td></tr>
-    <tr><td>5</td><td>C3</td><td>space below the first ledger line</td></tr>
-    <tr><td>6 (lowest)</td><td>G2</td><td>third ledger line below</td></tr>
-  </table>
-  <p>Tuned <b>G C F A D G</b> (low to high): fourths with a major third between strings 3 and 4 (F–A). It sits a fourth above the bass viol (D G C E A D). The tenor is non-transposing. Typically 7 gut frets, tied on and movable; they are a semitone apart, so the names here are the equal-tempered ones (real viols often use meantone).</p>
-  <p><b>Clefs:</b> the tenor viol usually reads <b>alto clef</b> (C clef on the middle line, which is middle C). Some editions use tenor clef (C on the 4th line) or octave treble, and high parts can be in treble at pitch. Landmarks: middle line = C4; top line = G4 (open 1st string); bottom line = F3 (open 4th string).</p>
-  <p><b>Tuned in E:</b> some tenor viols are tuned E A D F♯ B E, a minor third lower (the same notes as a guitar, with its G string at F♯). Under Settings, choose either <i>notes where they sound</i> (the neck shows the real notes of your viol) or <i>with G fingering</i>: you finger as on a viol in G, the tenor part is written a minor third higher (like a part for a clarinet in A), and it all sounds in tune with the app and the other parts.</p>
-  <p><b>Frets:</b> treble, tenor and bass viols all have seven frets of gut tied round the neck; the seventh is a fifth above the open string. Higher notes are stopped on the bare fingerboard above the frets (Settings: Frets 0 to 8 ... 12 shows those places).</p>
-  <p><b>Treble and bass viols:</b> the treble viol is tuned D3 G3 C4 E4 A4 D5 and reads treble clef. The bass viol is tuned D2 G2 C3 E3 A3 D4 and reads bass clef, with alto clef for high passages. Their necks can be shown under Settings. When a score plays, the part chosen under Neck shows (in the toolbar) lights up on the neck of its viol; choose Every part to get a neck for each part. Each viol has its colour wherever its parts appear: treble yellow, tenor gold, bass purple.</p>
-  <p><small>Sources: <a href="https://vdgsa.org/_files/ugd/d4b545_fba5a064eaad4df0b0ec9005c26cd76c.pdf">VdGSA viol help sheet</a>, <a href="https://saraband.com.au/altoclef.htm">Saraband: Viola &amp; Tenor Viol</a>, <a href="https://www.youngcomposersaward.co.uk/writing-for-viol-and-voices">Writing for viol and voices</a>.</small></p>
-</div>
-
-<div id="neckWrap"></div>
-<div id="roteBar" style="display:none">
-  <div class="rote-ask"><span id="roteAsk"></span><div id="roteStaff" style="display:none"></div><span id="roteHow"></span><span id="roteAcc" class="grp" style="display:none"><button data-a="-1" title="Flat">♭</button><button data-a="0" class="on" title="Natural">♮</button><button data-a="1" title="Sharp">♯</button></span><span id="roteMove" class="grp" style="display:none"><button id="roteUp" title="Move the note up a line or space (up arrow)">▲ Up</button><button id="roteDown" title="Move the note down a line or space (down arrow)">▼ Down</button><button id="roteCheck" title="Is the note in the right place? (Enter)">Check</button></span><span id="roteScore"></span><span id="roteSize" class="grp" style="display:none"><button id="roteSmaller" title="A smaller staff">Staff −</button><button id="roteBigger" title="A bigger staff">Staff +</button></span><button id="roteEnd">Finish</button></div>
-  <div class="rote-names" id="roteNames"></div>
-</div>
-<div id="statusLine"><span id="msg"></span><span class="score" id="recstat"></span></div>
-<div id="splitBar" title="Drag up or down to change the size of the necks and the score (double-click: back to normal)"><span></span></div>
+<div id="statusLine"><span class="score" id="recstat"></span></div>
 <div id="scoreBox"><h2 id="rectitle"></h2><div id="recscore"></div></div>
 
 <div id="pdfref">
   <div class="controls">
-    <b style="color:var(--gold)">Printed music</b>
+    <b>Printed music</b>
     <button id="scPrev">‹</button><span id="scPage" class="score">Page 1 / 1</span><button id="scNext">›</button>
-    <button id="scRead">Add this page to the score</button>
-    <button id="scAll">Add all pages</button>
-    <label title="Tick this if the key signature was read wrongly: choose the right key under Settings first"><input type="checkbox" id="scKey"> Use the key chosen in Settings</label>
+    <button id="scAll" class="primary">Read all pages</button>
+    <button id="scRead">Read this page only</button>
+    <label title="Tick this if the key signature was read wrongly: choose the right key under Edit first"><input type="checkbox" id="scKey"> Use the key chosen under Edit</label>
     <button id="pdfClose">Close</button>
   </div>
   <div class="score" id="scInfo"></div>
-  <div class="score" style="font-size:12px">Marks on the page: B breve, S semibreve, M minim, C crotchet, Q quaver, q semiquaver, a dot means dotted, r is a rest, a curve under a note is a tie, green lines are bar lines.</div>
+  <div class="score" style="font-size:12px">Marks on the page show what was read: B breve, S semibreve, M minim, C crotchet, Q quaver, q semiquaver, a dot means dotted, r is a rest, green lines are bar lines.</div>
   <div id="scView"><canvas id="scCanvas" style="width:100%;display:block"></canvas></div>
 </div>
 
@@ -351,9 +154,12 @@ span.pname{min-width:0;color:#6e4f28}
 <script src="omr.js?v=2.3"></script>
 <script>
 const {Renderer,Stave,StaveNote,Voice,Formatter,Accidental,Dot,Beam,StaveTie,Barline,Volta,GhostNote,StaveConnector,Tuplet,Fraction,Articulation,Curve,GraceNote,GraceNoteGroup,Glyph} = Vex.Flow;
-const $=id=>document.getElementById(id);
+// (parts of the page that are not there answer with a stand-in, so nothing depends on them)
+const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'all',tuneSel:'G',roteViol:'tenor',roteKind:'find',roteRange:'all',roteLen:'0',roteOct:'0',exKind:'open',exOct:'2',exDur:'16'};
+const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
+const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='4.3';
+const APP_VERSION='5.0';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -375,9 +181,9 @@ const VIOL_ORDER=['treble','tenor','bass'];
 // Treble (soprano) yellow, tenor gold, bass purple. neck: on the necks; title: names on the dark panels; ink: writing on
 // the neck colour; paper: notes and names on the score; mark: the highlighter.
 const VCOL={
-  treble:{neck:'#ffd83a',title:'#ffd83a',ink:'#1a1410',paper:'#7d6600',mark:'#fff06a'},
-  tenor:{neck:'#e3a01b',title:'#e8a317',ink:'#1a1410',paper:'#8a5200',mark:'#f0b13a'},
-  bass:{neck:'#8a4fd8',title:'#b48cf0',ink:'#ffffff',paper:'#5a2a9a',mark:'#c9a6f5'}};
+  treble:{neck:'#2563eb',title:'#2563eb',ink:'#ffffff',paper:'#1e293b',mark:'#ffe680'},
+  tenor:{neck:'#2563eb',title:'#2563eb',ink:'#ffffff',paper:'#1e293b',mark:'#ffe680'},
+  bass:{neck:'#2563eb',title:'#2563eb',ink:'#ffffff',paper:'#1e293b',mark:'#ffe680'}};
 const OPEN=VIOLS.tenor.open;
 // the tenor viol is usually tuned in G; some are tuned in E, a minor third lower (like a guitar with its G string at F♯)
 const TUNINGS={G:[67,62,57,53,48,43],E:[64,59,54,50,45,40]};
@@ -394,7 +200,7 @@ const neckKey=v=>neckUp(v)?wrKey(st.key):st.key;
 const SHARP=['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
 const FLAT =['C','D♭','D','E♭','E','F','G♭','G','A♭','A','B♭','B'];
 const NAT=[0,2,4,5,7,9,11];
-const st={mode:'explore',clef:'alto',acc:'all',key:0,frets:7,labels:true,sound:true,
+const st={mode:'explore',clef:'treble',acc:'all',key:0,frets:7,labels:true,sound:true,
   show:[],target:null,answered:false,right:0,total:0,streak:0,pending:null,hl:{},necks:['tenor'],sv:'tenor',neckFrac:null,zoom:1,follow:true,pulse:{},place:'all',roteSize:1.3,tune:'G'};
 // remembered on this device: the necks shown, the room they take (the bar above the score), the size of the music
 // and Follow score.
@@ -564,7 +370,7 @@ function play(m,snd){
 function fretX(n){return 100+2430*(1-Math.pow(2,-n/12));}
 const strName=m=>SHARP[pc(m)]+(Math.floor(m/12)-1);
 const neckDrawn={},boardDrawn={};   // what each neck's notes and its wood were last drawn as
-function drawNecks(){
+function drawNecks(){return;
   const wrap=$('neckWrap'),slots=neckSlots(),n=slots.length,ids=slots.map(s=>s.id).join();
   if(wrap.dataset.v!==ids){
     wrap.innerHTML=slots.map(s=>`<div class="neck" data-v="${s.id}"><div class="nlab"></div><div class="nsvg"><div class="nboard"></div><div class="ndots"></div></div></div>`).join('');
@@ -715,7 +521,7 @@ $('neckWrap').addEventListener('click',e=>{
 })();
 
 /* ---------- staff ---------- */
-function drawStaff(midis,colors){
+function drawStaff(midis,colors){return;
   const el=$('staff');el.innerHTML='';const sk=neckKey(st.sv);
   const w=Math.max(300,el.clientWidth||700);
   const r=new Renderer(el,Renderer.Backends.SVG);r.resize(w,270);
@@ -930,7 +736,7 @@ function guessViol(name,clef,sound){
   return sound==='violin'?'treble':sound==='cello'?'bass':'tenor';
 }
 const violOf=p=>p&&VIOLS[p.viol]?p.viol:'tenor';
-const sc={ts:[4,4],bpm:60,sel:-1,cur:0,bi:3,dots:0,parts:[newPart('Tenor viol',null,'viola',0)],pi:0,reverb:0.3,full:false,neckPart:0};   // neckPart: the part the neck shows while playing (-1: every part)
+const sc={ts:[4,4],bpm:60,sel:-1,cur:0,bi:3,dots:0,parts:[newPart('Part 1','treble','piano',0)],pi:0,reverb:0.3,full:false,neckPart:0};   // neckPart: the part the neck shows while playing (-1: every part)
 try{sc.full=localStorage.getItem('score-conv-full')==='1';}catch(e){}   // all the parts' staves together (remembered)
 Object.defineProperty(sc,'items',{get(){return sc.parts[sc.pi].items;},set(v){sc.parts[sc.pi].items=v;}});
 Object.defineProperty(sc,'hist',{get(){return sc.parts[sc.pi].hist;},set(v){sc.parts[sc.pi].hist=v;}});
@@ -945,7 +751,6 @@ function buildParts(){
       `<button class="ms mute${p.mute?' on':''}" title="Mute this part">M</button><button class="ms solo${p.solo?' on':''}" title="Play only the solo parts">S</button>`+
       `<label>Volume <input type="range" class="vol" min="0" max="1" step="0.01" value="${p.vol}"></label>`+
       `<label>Pan <input type="range" class="pan" min="-1" max="1" step="0.05" value="${p.pan}" title="Left to right"></label>`+
-      `<label title="The neck this part lights up on">Viol <select class="vio">${VIOL_ORDER.map(v=>`<option value="${v}"${v===violOf(p)?' selected':''}>${VIOLS[v].name.split(' ')[0]}</option>`).join('')}</select></label>`+
       `<label>Sound <select class="snd">${['violin','viola','cello','piano'].map(x=>`<option value="${x}"${x===p.sound?' selected':''}>${x[0].toUpperCase()+x.slice(1)}</option>`).join('')}</select></label>`;
     r.querySelector('.pname').onclick=()=>usePart(i);
     r.querySelector('.mute').onclick=()=>{p.mute=!p.mute;mixChanged();buildParts();};
@@ -953,7 +758,6 @@ function buildParts(){
     r.querySelector('.vol').oninput=e=>{p.vol=+e.target.value;mixChanged();};
     r.querySelector('.pan').oninput=e=>{p.pan=+e.target.value;mixChanged();};
     r.querySelector('.snd').onchange=e=>{p.sound=e.target.value;};
-    r.querySelector('.vio').onchange=e=>{p.viol=e.target.value;st.hl={};buildParts();markActivePart();if(playing)paintPlay();};   // (its colour changes too)
     B.append(r);
   });
   const rv=document.createElement('div');rv.className='prow';
@@ -962,80 +766,6 @@ function buildParts(){
   B.append(rv);
   buildPartPick();
 }
-/* ---------- practise ----------
-   Exercises for the tenor viol, written into the score so that they can be played (the neck shows each note). */
-const EX_INFO={
-  open:'The six open strings, low to high and back.',
-  major:'Up and down the major scale.',minor:'Up and down the natural minor scale.',
-  harm:'Harmonic minor: the 7th is raised, going up and coming down.',mel:'Melodic minor: 6th and 7th raised going up, natural coming down.',
-  chrom:'Every semitone (every fret), up and down.',arpMaj:'The notes of the major chord, up and down.',arpMin:'The notes of the minor chord, up and down.',
-  thirds:'The major scale in pairs a third apart: 1-3, 2-4, 3-5 ...',frets:'On each string from the lowest: open, frets 1, 2, 3, 4, and back to open.',
-  cross:'Neighbouring open strings in turn, from the lowest pair to the highest, and back.',
-  lowStep:'From the bottom line of the staff down by step to the lowest note, and back up.',lowLeap:'The bottom line, then each note below it in turn: a step, a third, a fourth ... so each ledger note is read from the line you know.',
-  lowLines:'The notes on the ledger lines below the staff, down and up, then the notes in the spaces between them.',lowOct:'A note on the staff, then the same note an octave lower, below the staff.',
-  highStep:'From the top line of the staff up by step to the highest note, and back down.',highLeap:'The top line, then each note above it in turn: a step, a third, a fourth ...',
-  highLines:'The notes on the ledger lines above the staff, up and down, then the notes in the spaces.',highOct:'A note on the staff, then the same note an octave higher, above the staff.'};
-const EX_STEPS={major:[2,2,1,2,2,2,1],minor:[2,1,2,2,1,2,2],harm:[2,1,2,2,1,3,1],chrom:[1,1,1,1,1,1,1,1,1,1,1,1],arpMaj:[4,3,5],arpMin:[3,4,5]};
-const PC_NAMES=['C','C♯/D♭','D','E♭','E','F','F♯/G♭','G','A♭','A','B♭','B'];
-PC_NAMES.forEach((n,i)=>{const o=document.createElement('option');o.value=i;o.textContent=n;if(i===7)o.selected=true;$('exStart').append(o);});
-// the key signature for a scale on this note (the spelling with fewer sharps or flats)
-function majorKeyOf(pc){let best=null;KEYS.forEach(k=>{const t=(k[0]*7%12+12)%12;if(t===pc&&(!best||Math.abs(k[0])<Math.abs(best)))best=k[0];});return best==null?0:best;}
-function makeExercise(){
-  const kind=$('exKind').value,pc=+$('exStart').value,dur=+$('exDur').value,top=OPEN[0]+st.frets;
-  let oct=+$('exOct').value,notes=[],key=0,title='',note='';
-  const lowest=n=>{let m=OPEN[5];while(m%12!==n)m++;return m;};
-  if(kind==='open'){const up=OPEN.slice().reverse();notes=up.concat(up.slice(0,-1).reverse());title='Open strings';}
-  else if(kind==='cross'){const s=OPEN.slice().reverse();for(let i=0;i<5;i++)notes.push(s[i],s[i+1],s[i],s[i+1]);for(let i=4;i>=0;i--)notes.push(s[i+1],s[i],s[i+1],s[i]);title='String crossing';}
-  else if(kind==='frets'){OPEN.slice().reverse().forEach(o=>{for(let f=0;f<=4;f++)notes.push(o+f);for(let f=3;f>=0;f--)notes.push(o+f);});title='Frets 0 to 4 on each string';}
-  else if(/^(low|high)/.test(kind)){
-    // notes below or above the staff (in the Clef chosen under Settings), in the key of the note chosen under Starting on
-    key=majorKeyOf(pc);
-    const [,,bd,td]=staffLimits(st.clef),ka=keyAcc(key),at=d=>{const L=LET[((d%7)+7)%7];return 12*(Math.floor(d/7)+1)+BASE[L]+ka[L];};
-    const lo=OPEN[5],hi=top,low=kind.startsWith('low'),edge=low?bd:td,dir=low?-1:1,inR=d=>at(d)>=lo&&at(d)<=hi;
-    let far=edge;while(inR(far+dir))far+=dir;   // the farthest note from the staff the viol can play
-    const steps=[];for(let d=edge;d!==far+dir;d+=dir)steps.push(d);
-    const t=kind.slice(low?3:4);
-    if(t==='Step')notes=steps.concat(steps.slice(0,-1).reverse()).map(at);
-    else if(t==='Leap'){for(let i=1;i<steps.length;i++)notes.push(at(edge),at(steps[i]));notes.push(at(edge));}
-    else if(t==='Lines'){const lines=steps.filter((d,i)=>i>0&&i%2===0),spaces=steps.filter((d,i)=>i%2===1);
-      [lines,spaces].forEach(g=>{if(g.length)notes.push(...g.concat(g.slice(0,-1).reverse()).map(at));});}
-    else{for(let d=edge+(low?1:-1)*1;Math.abs(d-edge)<=7;d-=dir){if(inR(d+7*dir)&&(low?d+7*dir<edge:d+7*dir>edge))notes.push(at(d),at(d+7*dir));}}   // (octave pairs)
-    if(!notes.length){notes=[at(edge)];note=' The viol has no notes '+(low?'below':'above')+' the staff in this clef.';}
-    title=$('exKind').selectedOptions[0].textContent;
-  }
-  else{
-    const steps=kind==='thirds'?EX_STEPS.major:kind==='mel'?[2,1,2,2,2,2,1]:EX_STEPS[kind];
-    let start=lowest(pc);
-    if(start+12*oct>top){if(oct===2){oct=1;note=' Two octaves do not fit on the neck from this note, so it is one octave.';}}
-    if(start+12*oct>top)note=' Some notes are above the frets shown.';
-    const up=[start];for(let o=0;o<oct;o++)for(const s of steps)up.push(up[up.length-1]+s);
-    let down=up.slice().reverse();
-    if(kind==='mel'){const nat=[start];for(let o=0;o<oct;o++)for(const s of EX_STEPS.minor)nat.push(nat[nat.length-1]+s);down=nat.reverse();}
-    if(kind==='thirds'){notes=[];for(let i=0;i+2<up.length;i++)notes.push(up[i],up[i+2]);notes.push(up[up.length-1]);for(let i=up.length-1;i-2>=0;i--)notes.push(up[i],up[i-2]);notes.push(up[0]);}
-    else notes=up.concat(down.slice(1));
-    const minor=['minor','harm','mel','arpMin'].includes(kind);
-    key=kind==='chrom'?0:minor?majorKeyOf((pc+3)%12):majorKeyOf(pc);
-    const nm=spell(start,key).pcname;
-    title=`${nm} ${$('exKind').selectedOptions[0].textContent.toLowerCase()}`+(kind!=='thirds'&&kind!=='arpMaj'&&kind!=='arpMin'||oct>1?`, ${oct} octave${oct>1?'s':''}`:'');
-  }
-  const items=notes.map(m=>({m,d:dur}));
-  items[items.length-1].d=Math.max(dur,64);   // end on a long note
-  items[0].sec={k:key,ts:[4,4],title};
-  return {items,key,title,note};
-}
-$('exKind').onchange=()=>{const k=$('exKind').value;$('exInfo').textContent=EX_INFO[k]+(/^(low|high)/.test(k)?' '+ledgerGuide('tenor',k.startsWith('low')?'low':'high'):'');};
-$('exInfo').textContent=EX_INFO.open;
-$('exGo').onclick=()=>{
-  if(sc.parts.some(p=>p.items.length)&&!confirm('Replace the score with this exercise?'))return;
-  stopPlay();
-  const ex=makeExercise();
-  if(TR()){ex.items.forEach(it=>{if(it.m!=null)it.m-=TR();});ex.key=unKey(ex.key);ex.items[0].sec.k=ex.key;}   // (written for G fingering, kept as it sounds)
-  sc.parts=[newPart('Tenor viol',null,'viola',0)];sc.pi=0;sc.neckPart=0;sc.items=ex.items;sc.sel=-1;sc.cur=ex.items.length;
-  st.key=ex.key;$('key').value=ex.key;refresh();
-  sc.ts=[4,4];$('tsn').value=4;$('tsd').value=4;$('title').value=ex.title;$('fromSel').value='start';$('fromBar').value='';
-  buildParts();drawRecording();openFold('pPrac',false);$('scoreBox').scrollTop=0;
-  stat(`${ex.title}. Press Play to hear it; the neck lights up where each note is played.`+ex.note);
-};
 function buildPartPick(){
   const P=$('partSel');P.innerHTML='';sc.parts.forEach((p,i)=>{const o=document.createElement('option');o.value=i;o.textContent=p.name;P.append(o);});
   P.value=sc.pi;$('partPick').style.display=$('fullBtn').style.display=sc.parts.length>1?'':'none';
@@ -1054,7 +784,7 @@ function usePart(i){
   if(noteElsAll){noteEls=noteElsAll[i];markActivePart();buildFrom();}   // the full score already shows every part
   else drawRecording();
   if(playing)paintPlay();
-  stat(noteElsAll?`Working on the ${part().name} part: notes from the neck go into it.`:`Showing the ${part().name} part.`);
+  stat(noteElsAll?`Working on the ${part().name} part.`:`Showing the ${part().name} part.`);
 }
 const durT=()=>BASES[sc.bi][1]*(2-Math.pow(2,-sc.dots));
 const entryOn=()=>$('entryChk').checked&&st.mode==='explore';
@@ -1090,7 +820,24 @@ function setSel(i){
   if(noteEls.has(i)&&!rec.on){paintNote(prev,null);paintNote(i,'#1f5fbf');selEl=noteEls.get(i)[0];}
   else drawRecording();
   if(selEl)selEl.scrollIntoView({block:'nearest',inline:'nearest'});
-  stat('Note '+(i+1)+' of '+sc.items.length+(it.m==null?' (rest)':(T=>' ('+spell(it.m+T,T?wrKey(keyAt(i)):keyAt(i)).name+', '+solfa(it.m+T,T?wrKey(keyAt(i)):keyAt(i))+')')(isTenorPart(part())?TR():0))+'. Left/right arrows move between notes, up/down change its rhythm, Delete removes it.');
+  stat('Note '+(i+1)+' of '+sc.items.length+(it.m==null?' (rest)':' ('+[it.m].concat(it.ch||[]).map(m=>spell(m,keyAt(i)).name).join(' ')+')')+'. Up and down arrows change its pitch, 1 to 6 its rhythm, Delete removes it.');
+}
+// the selected note moves up or down: a step in the key, a semitone, or an octave (a chord moves as a whole)
+function shiftPitch(dir,how){
+  const i=sc.sel;if(i<0||!sc.items[i]){stat('Click a note in the score first.');return;}
+  const it=sc.items[i];if(it.m==null){stat('That is a rest: add a note with the letters A to G.');return;}
+  const k=keyAt(i),mv=m=>{let n=m;if(how==='oct')n=m+12*dir;else if(how==='semi')n=m+dir;else{n=m+dir;while(!spell(n,k).inKey)n+=dir;}return Math.max(21,Math.min(108,n));};
+  snap();it.m=mv(it.m);if(it.ch)it.ch=it.ch.map(mv);delete it.sp;delete it.tn;
+  drawRecording();play(it.m);
+  stat('Now '+[it.m].concat(it.ch||[]).map(m=>spell(m,k).name).join(' ')+'.');
+}
+// a new note by its letter, in the octave nearest the note before it
+function addLetter(L){
+  const k=keyAt(Math.max(0,sc.cur-1)),want=pc(BASE[L]+keyAcc(k)[L]);
+  let ref=null;for(let j=Math.min(sc.cur,sc.items.length)-1;j>=0;j--)if(sc.items[j].m!=null){ref=sc.items[j].m;break;}
+  if(ref==null)ref={bass:50,alto:60,tenor:57,treble8:60}[scoreClef()]||69;
+  let m=ref-pc(ref)+want;if(m-ref>6)m-=12;else if(ref-m>6)m+=12;
+  addItem(m);play(m);
 }
 function delNote(){
   const i=sc.sel>=0?sc.sel:sc.cur-1;if(i<0||i>=sc.items.length)return;
@@ -1335,9 +1082,9 @@ function drawRecording(){
 function drawScore(el){
   el.innerHTML='';noteElsAll=null;
   const T=isTenorPart(part())?TR():0,KK=k=>T?wrKey(k):k;   // (the tenor part of a viol in E played with G fingering)
-  $('rectitle').textContent=$('title').value||'Tenor viol';
+  $('rectitle').textContent=$('title').value||'Score';
   const nReal=sc.items.length,bars=splitBars(viewItems(),part().pb);
-  if(!bars.length){el.innerHTML='<div class="ph">Pick a rhythm, then click notes on the neck. They appear here.</div>';noteEls=new Map();return;}
+  if(!bars.length){el.innerHTML='<div class="ph"><b>Open a score to begin</b>A PDF or a picture of printed music, or a MusicXML, MIDI or saved score file.<br>Press Open score, or drop the file here.</div>';noteEls=new Map();return;}
   const W=Math.max(340,((el.clientWidth||900)-12)/st.zoom);   // drawn narrower and stretched to the width: bigger music
   const ksW=k=>Math.abs(k)*11+(k?8:0),tsW=34;
   const nw=p=>26+p.d*0.5;
@@ -1462,10 +1209,10 @@ function fullColumns(){
 }
 function drawFullScore(el){
   el.innerHTML='';
-  $('rectitle').textContent=$('title').value||'Tenor viol';
+  $('rectitle').textContent=$('title').value||'Score';
   const cols=fullColumns(),NP=sc.parts.length,TP=sc.parts.map(p=>isTenorPart(p)?TR():0),KP=TP.map(t=>k=>t?wrKey(k):k);
   noteElsAll=sc.parts.map(()=>new Map());noteEls=noteElsAll[sc.pi];selEl=null;
-  if(!cols.length){el.innerHTML='<div class="ph">Pick a rhythm, then click notes on the neck. They appear here.</div>';return;}
+  if(!cols.length){el.innerHTML='<div class="ph"><b>Open a score to begin</b>A PDF or a picture of printed music, or a MusicXML, MIDI or saved score file.<br>Press Open score, or drop the file here.</div>';return;}
   const W=Math.max(340,((el.clientWidth||900)-12)/st.zoom),nameW=70;
   const ksW=k=>Math.abs(k)*11+(k?8:0),tsW=34,nw=p=>26+p.d*0.5;
   const headW=(b,first)=>50+ksW(b.key)+(first||b.sec?tsW:0);
@@ -1827,7 +1574,7 @@ function applyImported(items,o,label){
   const out=items.filter(i=>i.m!=null&&(i.m<OPEN[5]||i.m>OPEN[0]+st.frets)).length;
   buildParts();drawRecording();   // (a saved score can have several parts: the Parts menu and the toolbar follow)
   if(sc.parts.length>1){stat(`Imported ${sc.parts.length} parts from ${label}: ${sc.parts.map(p=>p.name).join(', ')}.`);return;}
-  stat(`Imported ${items.filter(i=>i.m!=null).length} notes from ${label}.`+(out?` ${out} are outside the tenor viol's range (G2 up to fret ${st.frets}).`:''));
+  stat(`Imported ${items.filter(i=>i.m!=null).length} notes from ${label}.`);
 }
 function parseMidi(buf){
   const dv=new DataView(buf);let p=0;
@@ -2005,7 +1752,7 @@ async function showScanPage(i){
 }
 function tsFromBar(t){if(!t)return null;if(t%64===0&&t/64>=4&&t/64<=8)return [t/64,1];if(t%32===0&&t/16>=6&&t/32<=16)return [t/32,2];if(t%16===0&&t/16<=16)return [t/16,4];if(t%8===0&&t/8<=16)return [t/8,8];return null;}
 // The parts of a full score: the staves of a system, top to bottom. Their clefs name them.
-const PART_OF={treble:['Treble viol','violin',-0.45],soprano:['Treble viol','violin',-0.45],alto:['Tenor viol','viola',0],tenor:['Tenor viol','viola',0],mezzo:['Tenor viol','viola',0],bass:['Bass viol','cello',0.45]};
+const PART_OF={treble:['Treble','violin',-0.45],soprano:['Soprano','violin',-0.45],alto:['Alto','viola',0],tenor:['Tenor','viola',0],mezzo:['Mezzo','viola',0],bass:['Bass','cello',0.45]};
 function scanParts(pages){
   // as many parts as the largest system has staves (pieces for fewer instruments leave the others silent)
   let n=1;pages.forEach(pg=>pg.staves.forEach(s=>{if(s.elems.length&&s.sysSize>n)n=s.sysSize;}));
@@ -2088,6 +1835,7 @@ function addScannedPoly(all,pages,override){
   sc.pi=0;sc.sel=-1;sc.cur=sc.items.length;
   if(fresh){
     sc.neckPart=0;
+    {const mk=made.flatMap(m=>m.items).find(x=>x.tx&&/=\s*\d+/.test(x.tx)),n=mk?+/=\s*(\d+)/.exec(mk.tx)[1]:0;if(n>=30&&n<=240){sc.bpm=n;$('bpm').value=n;}}
     const f=pages.flatMap(pg=>pg.staves).find(s=>s.pe&&s.pe.length);
     const k=f?(f.keyFinal!=null?f.keyFinal:f.fifths):null;
     if(override==null&&k!=null&&KEYS.some(x=>x[0]===k)){st.key=k;$('key').value=k;refresh();}
@@ -2115,7 +1863,7 @@ function addScannedPart(list,override,barT){
   // the clef this part is usually printed in (pieces in another clef are shown in theirs)
   {const cl={};list.forEach(sp=>sp.page.staves.forEach(s=>{if(s.clefType)cl[s.clefType]=(cl[s.clefType]||0)+1;}));const mc=Object.keys(cl).sort((a,b)=>cl[b]-cl[a])[0];if(mc&&!part().mainClef)part().mainClef=mc;
     if(wasEmpty){part().pb=true;   // the bars are the printed ones
-      if((mc==='treble'||mc==='bass')&&!part().clef){part().clef=mc;if(part().name==='Tenor viol'){part().name=mc==='treble'?'Melody':'Bass line';part().sound=mc==='treble'?'violin':'cello';}}}}
+      if((mc==='treble'||mc==='bass')&&!part().clef){part().clef=mc;if(part().name==='Part 1'){part().name=mc==='treble'?'Melody':'Bass line';part().sound=mc==='treble'?'violin':'cello';}}}}
   sc.items.splice(sc.cur,0,...items);sc.cur+=items.length;sc.sel=-1;drawRecording();buildParts();buildFrom();
   const out=items.filter(i=>i.m!=null&&(i.m<OPEN[5]||i.m>OPEN[0]+st.frets)).length;
   const pieces=items.filter(i=>i.sec).length;
@@ -2136,7 +1884,7 @@ async function loadFile(f){
   try{
     if(n.endsWith('.json')){
       const d=JSON.parse(await f.text());
-      if(d.app!=='tenor-viol-trainer')throw new Error('not a Score Converter file');   // (the files still say tenor-viol-trainer inside, as before)
+      if(d.app!=='tenor-viol-trainer'&&d.app!=='score-converter')throw new Error('not a Score Converter file');   // (the files still say tenor-viol-trainer inside, as before)
       let items;
       const okItem=i=>i&&typeof i.d==='number'&&(i.m==null||typeof i.m==='number');
       if(Array.isArray(d.parts)&&d.parts.length){   // a score with parts
@@ -2171,7 +1919,7 @@ for(let i=1;i<=16;i++){const o=document.createElement('option');o.value=i;o.text
 $('tsn').value=4;$('tsd').value=4;
 $('tsn').onchange=$('tsd').onchange=()=>{sc.ts=[+$('tsn').value,+$('tsd').value];sc.parts.forEach(p=>{if(p.items[0]&&p.items[0].sec&&p.items[0].sec.ts)p.items[0].sec.ts=sc.ts;});drawRecording();};
 $('bpm').onchange=()=>{sc.bpm=Math.max(30,Math.min(240,+$('bpm').value||60));$('bpm').value=sc.bpm;drawRecording();};
-$('title').oninput=()=>{$('rectitle').textContent=$('title').value||'Tenor viol';};
+$('title').oninput=()=>{$('rectitle').textContent=$('title').value||'Score';};
 $('restBtn').onclick=()=>addItem(null);
 $('namesChk').onchange=$('solfaChk').onchange=()=>{drawRecording();drawStaff(st.show||[]);};
 $('undoBtn').onclick=()=>{if(!sc.hist.length)return;sc.items=JSON.parse(sc.hist.pop());sc.sel=-1;sc.cur=sc.items.length;drawRecording();};
@@ -2182,7 +1930,7 @@ $('upBtn').onclick=()=>setDur((sc.bi-1+BASES.length)%BASES.length);
 $('downBtn').onclick=()=>setDur((sc.bi+1)%BASES.length);
 $('endBtn').onclick=()=>{sc.sel=-1;sc.cur=sc.items.length;drawRecording();stat('Adding notes at the end.');};
 function clearScore(){if(rec.on)stopRec();stopPlay();
-  if(sc.parts.length>1){sc.parts=[newPart('Tenor viol',null,'viola',0)];sc.pi=0;sc.neckPart=0;sc.sel=-1;sc.cur=0;buildParts();drawRecording();stat('Cleared all parts.');return;}
+  if(sc.parts.length>1){sc.parts=[newPart('Part 1','treble','piano',0)];sc.pi=0;sc.neckPart=0;sc.sel=-1;sc.cur=0;buildParts();drawRecording();stat('Cleared all parts.');return;}
   snap();sc.items=[];sc.sel=-1;sc.cur=0;drawRecording();buildParts();stat('Cleared (Undo brings it back).');}
 $('clearBtn').onclick=clearScore;
 $('wipeBtn').onclick=()=>{   // always on screen: wipes any exercise, test or piece in the white score, after asking
@@ -2190,6 +1938,14 @@ $('wipeBtn').onclick=()=>{   // always on screen: wipes any exercise, test or pi
   const n=sc.parts.length;
   if(confirm(n>1?`Delete the whole score, all ${n} parts? This cannot be undone.`:'Delete everything in the score? (Undo brings it back.)'))clearScore();};
 $('playBtn').onclick=playScore;
+$('pUpBtn').onclick=()=>shiftPitch(1,'step');$('pDnBtn').onclick=()=>shiftPitch(-1,'step');
+$('pShBtn').onclick=()=>shiftPitch(1,'semi');$('pFlBtn').onclick=()=>shiftPitch(-1,'semi');
+$('pOuBtn').onclick=()=>shiftPitch(1,'oct');$('pOdBtn').onclick=()=>shiftPitch(-1,'oct');
+'CDEFGAB'.split('').forEach(L=>{const b=document.createElement('button');b.textContent=L;b.title='Add the note '+L;b.onclick=()=>addLetter(L);$('letBtns').append(b);});
+// a file dropped anywhere on the page is opened
+addEventListener('dragover',e=>{e.preventDefault();document.body.classList.add('drag');});
+addEventListener('dragleave',e=>{if(!e.relatedTarget)document.body.classList.remove('drag');});
+addEventListener('drop',e=>{e.preventDefault();document.body.classList.remove('drag');const f=e.dataTransfer&&e.dataTransfer.files[0];if(f)loadFile(f);});
 function openFold(id,open){
   document.querySelectorAll('.foldp').forEach(x=>x.classList.toggle('open',x.id===id&&open));
   document.querySelectorAll('.fold').forEach(x=>x.classList.toggle('open',x.dataset.p===id&&open));
@@ -2226,7 +1982,7 @@ $('followBtn').onclick=()=>{
 };
 followUI();
 $('fullBtn').onclick=()=>{sc.full=!sc.full;keep('score-conv-full',sc.full?'1':null);buildPartPick();keepScroll(drawRecording);
-  stat(sc.full?`Every part's staff is shown. The ${part().name} part (in gold) is the one you work on: click a note or a name to change it.`:`Showing the ${part().name} part only.`);};
+  stat(sc.full?`Every part's staff is shown. The ${part().name} part is the one you work on: click a note or a part's name to change it.`:`Showing the ${part().name} part only.`);};
 // the necks shown
 document.querySelectorAll('.neckChk').forEach(c=>{c.checked=st.necks.includes(c.value);c.onchange=()=>{
   const on=[...document.querySelectorAll('.neckChk')].filter(x=>x.checked).map(x=>x.value);
@@ -2259,7 +2015,7 @@ $('impBtn').onclick=()=>$('impFile').click();
 $('impFile').onchange=()=>{const f=$('impFile').files[0];if(f)loadFile(f);$('impFile').value='';};
 $('pdfClose').onclick=()=>{$('pdfref').classList.remove('open');};
 // the whole score, as saved in a .json file (and kept on this device)
-const scoreData=()=>({app:'tenor-viol-trainer',version:3,title:$('title').value,key:st.key,clef:st.clef,bpm:sc.bpm,ts:sc.ts,reverb:sc.reverb,part:sc.pi,neckPart:sc.neckPart,
+const scoreData=()=>({app:'score-converter',version:3,title:$('title').value,key:st.key,clef:st.clef,bpm:sc.bpm,ts:sc.ts,reverb:sc.reverb,part:sc.pi,neckPart:sc.neckPart,
   parts:sc.parts.map(p=>({name:p.name,clef:p.clef,mainClef:p.mainClef||null,kb:p.kb||null,pb:!!p.pb,v2:p.v2||null,sound:p.sound,viol:violOf(p),vol:p.vol,pan:p.pan,mute:p.mute,solo:p.solo,items:p.items}))});
 $('expBtn').onclick=()=>{
   if(rec.on)stopRec();
@@ -2339,259 +2095,28 @@ $('pdfBtn').onclick=()=>{if(rec.on)stopRec();stopPlay();drawRecording();stat('In
 addEventListener('keydown',e=>{
   if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
   if(roteMoving()&&['ArrowUp','ArrowDown','Enter'].includes(e.key)){e.preventDefault();if(e.key==='Enter')roteStaffCheck();else roteMove(e.key==='ArrowUp'?1:-1);return;}   // (putting a note on the staff)
-  if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();moveSel(e.key==='ArrowLeft'?-1:1);}
-  else if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();setDur((sc.bi+(e.key==='ArrowUp'?-1:1)+BASES.length)%BASES.length);}
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();$('undoBtn').click();return;}
+  if(e.ctrlKey||e.metaKey||e.altKey)return;
+  if(e.key===' '){e.preventDefault();playScore();}
+  else if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();moveSel(e.key==='ArrowLeft'?-1:1);}
+  else if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();shiftPitch(e.key==='ArrowUp'?1:-1,e.shiftKey?'semi':'step');}
   else if(e.key>='1'&&e.key<='6')setDur(+e.key-1);
   else if(e.key==='.')setDots((sc.dots+1)%3);
   else if(e.key==='r'||e.key==='R')addItem(null);
+  else if(/^[a-gA-G]$/.test(e.key))addLetter(e.key.toUpperCase());
   else if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();delNote();}
-  else if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();$('undoBtn').click();}
 });
-/* ---------- rote: drills with a mark, kept by date and time ----------
-   Six drills on the neck of the viol chosen (the tenor viol by default, which reads alto clef):
-   - Find the note: a note's name is shown; tap the neck where it is (any octave, or with the octave).
-   - Name the note: a place on the neck lights up; press its name.
-   - Read the staff, find it: a note on the staff in the viol's clef; tap it on the neck in the right octave.
-   - Read the staff, name it: a note on the staff; press its name.
-   - Read a line: six notes on the staff; play them on the neck one after another.
-   - Same note, another place: a note lights up with its name; tap the same note in another place.
-   A round goes on until Finish, or for a set time (as many as you can). It can keep to one string. Every round is kept
-   on this device with its date, time, mark and speed (a round left unfinished is kept too). */
-const ROTE_KINDS={find:'Name shown: tap it on the neck',name:'Note on the neck: press its name',nstaff:'Note on the neck: put it on the staff',
-  sfind:'Note on the staff: tap it on the neck',sname:'Note on the staff: press its name',line:'Line on the staff: play it on the neck',same:'Same note, another place on the neck'};
-const ROTE_INFO={find:"A note's name is shown: tap it on the neck.",name:'A place on the neck lights up: press its name.',
-  nstaff:"A place on the neck lights up. A note waits on the staff, somewhere else: move it with Up and Down (a line or space at a time) to where that note is written, in the viol's clef (alto clef for the tenor viol), choose ♭ or ♯ if it needs one, then press Check. Tapping the staff moves the note near the tap, for the arrows to finish.",
-  sfind:"A note is shown on the staff, in the viol's clef (alto clef for the tenor viol): tap it on the neck, in the right octave.",
-  sname:"A note is shown on the staff, in the viol's clef: press its name.",line:'Six notes are shown on the staff: play them on the neck one after another, as you would read them.',
-  same:'A note lights up with its name: tap the same note in another place on the neck.'};
-const NOTE_BTNS=[[0,'C'],[1,'C♯ D♭'],[2,'D'],[3,'D♯ E♭'],[4,'E'],[5,'F'],[6,'F♯ G♭'],[7,'G'],[8,'G♯ A♭'],[9,'A'],[10,'A♯ B♭'],[11,'B']];
-NOTE_BTNS.forEach(([p,t])=>{const b=document.createElement('button');b.textContent=t;b.onclick=()=>roteAnswer(p);$('roteNames').append(b);});
-function roteLog(){try{const l=JSON.parse(localStorage.getItem('score-conv-rote')||'[]');return Array.isArray(l)?l:[];}catch(e){return [];}}
-function roteKeep(r){const l=roteLog();l.unshift(r);try{localStorage.setItem('score-conv-rote',JSON.stringify(l.slice(0,2000)));}catch(e){}}
-// a black note is named with a sharp or a flat, at random, so both are learnt
-const roteName=(m,oct)=>([1,3,6,8,10].includes(pc(m))&&Math.random()<0.5?FLAT:SHARP)[pc(m)]+(oct?Math.floor(m/12)-1:'');
-function roteSpell(m){   // a note to show on the staff, spelt with a sharp or a flat
-  const nm=([1,3,6,8,10].includes(pc(m))&&Math.random()<0.5?FLAT:SHARP)[pc(m)],off=nm.includes('♯')?1:nm.includes('♭')?-1:0,oct=Math.floor((m-off)/12)-1;
-  return {m,name:nm+oct,vf:nm[0].toLowerCase()+(off>0?'#':off<0?'b':''),oct,acc:off>0?'#':off<0?'b':null};
-}
-const roteNow=()=>({at:new Date().toISOString(),kind:rote.kind,viol:rote.viol,oct:rote.oct,str:rote.str,range:rote.range,limit:rote.limit,right:rote.right,total:rote.total,secs:Math.round((Date.now()-rote.t0)/1000)});
-const roteSaveNow=()=>{try{localStorage.setItem('score-conv-rote-now',JSON.stringify(roteNow()));}catch(e){}};   // (in case the page is closed before Finish)
-function roteScore(){
-  let t=rote.total?`Right ${rote.right} of ${rote.total} (${Math.round(100*rote.right/rote.total)}%)`+(rote.streak>1?`, ${rote.streak} in a row`:''):'Right 0 of 0';
-  if(rote.limit){const left=Math.max(0,Math.ceil((rote.end-Date.now())/1000));t+=`, ${Math.floor(left/60)}:${String(left%60).padStart(2,'0')} left`;}
-  $('roteScore').textContent=t;
-}
-const strOk=s=>rote.str<0||s===rote.str;
-function rotePool(){const ps=positions(rote.viol),f=ps.filter(p=>strOk(p.s)&&roteRangeOk(p.m));return f.length?f:ps;}
-// low and high notes: below the bottom line or above the top line of the viol's staff (in its clef)
-const ROTE_RANGES={low:'low notes',high:'high notes',ledger:'low and high notes',staff:'notes on the staff'};
-function staffLimits(clef){   // the pitches of the bottom and top lines
-  const [L,O]=CLEF_TOP[clef]||CLEF_TOP.alto,td=O*7+LET.indexOf(L),nat=d=>12*(Math.floor(d/7)+1)+BASE[LET[((d%7)+7)%7]];
-  return [nat(td-8),nat(td),td-8,td];
-}
-function roteRangeOk(m){
-  if(rote.range==='all')return true;
-  const [bl,tl]=staffLimits(VIOLS[rote.viol].clef||st.clef);
-  return rote.range==='low'?m<bl:rote.range==='high'?m>tl:rote.range==='ledger'?m<bl||m>tl:m>=bl&&m<=tl;
-}
-// where the notes below or above the staff are written, for the viol and its clef (with its open strings named)
-function ledgerGuide(viol,which){
-  const V=VIOLS[viol],clef=V.clef||st.clef,[,,bd,td]=staffLimits(clef),lo=V.open[5],hi=V.open[0]+st.frets;
-  const nat=d=>12*(Math.floor(d/7)+1)+BASE[LET[((d%7)+7)%7]],name=d=>LET[((d%7)+7)%7]+Math.floor(d/7);
-  const place=(n,dir)=>n===1?`in the space ${dir==='below'?'under':'over'} the staff`:n%2===0?`on ledger line ${n/2} ${dir}`:`in the space ${dir==='below'?'under':'over'} ledger line ${(n-1)/2}`;
-  const open=m=>{const s=V.open.indexOf(m);return s<0?'':` (the open ${['1st','2nd','3rd','4th','5th','6th'][s]} string)`;};
-  const out=[];
-  if(which!=='high'){const l=[];for(let n=1;nat(bd-n)>=lo;n++)l.push(`${name(bd-n)} ${place(n,'below')}${open(nat(bd-n))}`);if(l.length)out.push(`Below the staff (${CLEF_NAME[clef]||''}, bottom line ${name(bd)}): `+l.join('; ')+'.');}
-  if(which!=='low'){const l=[];for(let n=1;nat(td+n)<=hi;n++)l.push(`${name(td+n)} ${place(n,'above')}`);if(l.length)out.push(`Above the staff (top line ${name(td)}${open(nat(td)).replace(' (',', ').replace(')','')}): `+l.join('; ')+'.');}
-  return out.join(' ');
-}
-// notes on the little staff, in the viol's clef: the one to play now in blue, the ones played in green or red
-function roteStaffDraw(notes,cur,marks,tall){
-  rote.lastDraw=[notes,cur,marks,tall];   // (drawn again at a new size)
-  const el=$('roteStaff');el.innerHTML='';el.classList.toggle('tap',!!tall);
-  const clef=VIOLS[rote.viol].clef||st.clef,vfClef=clef==='treble8'?'treble':clef,shift=clef==='treble8'?1:0,k=st.roteSize;
-  const W=notes.length>1&&!tall?Math.max(300,Math.min(520,(($('roteBar').clientWidth||600)-40)/k)):tall?260:190,H=tall?170:134;
-  const r=new Renderer(el,Renderer.Backends.SVG);r.resize(W,H);const ctx=r.getContext();
-  const stave=new Stave(4,tall?25:12,W-8);if(clef==='treble8')stave.addClef('treble','default','8vb');else stave.addClef(clef);stave.setContext(ctx).draw();
-  rote.stave=stave;
-  if(!notes.length){const svg=el.querySelector('svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.style.width=Math.round(W*k)+'px';svg.style.maxWidth='100%';svg.style.height='auto';return;}
-  const sns=notes.map((n,i)=>{const sn=new StaveNote({keys:[n.vf+'/'+(n.oct+shift)],duration:notes.length>1&&!tall?'q':'w',clef:vfClef});
-    if(n.acc)sn.addModifier(new Accidental(n.acc));
-    const c=marks[i]!=null?(marks[i]?'#2d8a3a':'#c0392b'):i===cur?'#1f5fbf':null;if(c)sn.setStyle({fillStyle:c,strokeStyle:c});return sn;});
-  const v=new Voice({num_beats:notes.length>1?notes.length*(tall?4:1):4,beat_value:4}).setStrict(false);v.addTickables(sns);
-  new Formatter().joinVoices([v]).format([v],W-(notes.length>1?90:70));v.draw(ctx,stave);
-  const svg=el.querySelector('svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.style.width=Math.round(W*k)+'px';svg.style.maxWidth='100%';svg.style.height='auto';
-}
-function roteResize(n){
-  st.roteSize=Math.round(Math.max(0.8,Math.min(3,st.roteSize+n))*10)/10;keep('score-conv-rotesize',String(st.roteSize));
-  if(rote.on&&rote.lastDraw&&$('roteStaff').style.display!=='none')roteStaffDraw(...rote.lastDraw);
-}
-$('roteSmaller').onclick=()=>roteResize(-0.2);
-$('roteBigger').onclick=()=>roteResize(0.2);
-function roteNext(){
-  if(!rote.on)return;
-  const K=rote.kind,all=positions(rote.viol),prev=rote.target;let pool=rotePool();
-  rote.wait=false;st.hl={};st.hlBlank=null;
-  const staff=K==='sfind'||K==='sname'||K==='line'||K==='nstaff';$('roteStaff').style.display=$('roteSize').style.display=staff?'':'none';$('roteAsk').style.display=staff?'none':'';
-  if(K==='same'){const two=q=>all.some(o=>o.m===q.m&&o.k!==q.k);pool=pool.filter(two);if(!pool.length)pool=all.filter(two);}   // (notes with another place)
-  if(K==='line'){
-    // six notes that move like a tune, up and down in small steps through the notes of the round
-    const ms=[...new Set(pool.map(q=>q.m))].sort((x,y)=>x-y),line=[];let i=Math.floor(Math.random()*ms.length);
-    for(let n=0;n<6;n++){line.push(roteSpell(ms[i]));if(ms.length<2)continue;let j;do{j=i+Math.round((Math.random()*2-1)*3);}while(j===i||j<0||j>=ms.length);i=j;}
-    rote.target={line,cur:0,marks:[]};roteStaffDraw(line,0,[]);
-    $('roteHow').textContent='Play the notes on the neck, one after another.';msg('Play the line on the neck');
-    drawNecks();return;
-  }
-  let p,n=0;   // never the same twice running
-  do{p=pool[Math.floor(Math.random()*pool.length)];}while(n++<60&&prev&&prev.m!=null&&(K==='find'?(rote.oct?p.m===prev.m:pc(p.m)===pc(prev.m)):K==='name'||K==='same'?p.k===prev.k:p.m===prev.m));
-  if(K==='find'){
-    rote.target={m:p.m,name:roteName(p.m,rote.oct)};
-    $('roteAsk').textContent=rote.target.name;$('roteHow').textContent='Tap it on the neck'+(rote.oct?'.':' (any octave).');msg('Find '+rote.target.name+' on the neck');
-  }else if(K==='name'){
-    rote.target=p;st.hl={[p.k]:'#d9a441'};st.hlBlank=p.k;
-    $('roteAsk').textContent='?';$('roteHow').textContent='Which note is the gold dot? Press its name.';msg('Which note is the gold dot?');
-  }else if(K==='nstaff'){
-    rote.target=p;st.hl={[p.k]:'#d9a441'};st.hlBlank=p.k;rote.acc=0;roteAccSet(0);
-    const sh=SHARP[pc(p.m)].length>1?1:0,dia=(Math.floor((p.m-sh)/12)-1)*7+LET.indexOf(SHARP[pc(p.m)][0]),top=roteTopDia();
-    let off;do{off=(Math.random()<0.5?-1:1)*(2+Math.floor(Math.random()*4));}while(top-(dia+off)<-10||top-(dia+off)>18);   // a few lines or spaces away
-    rote.pos=dia+off;roteMoveDraw();
-    $('roteHow').textContent='Move the note to where the gold dot is written, then Check.';msg('Where is the gold dot on the staff?');
-  }else if(K==='same'){
-    rote.target=p;st.hl={[p.k]:'#d9a441'};
-    $('roteAsk').textContent=spell(p.m).name;$('roteHow').textContent='Tap the same note in another place.';msg('Find '+spell(p.m).name+' in another place');
-  }else{
-    rote.target=Object.assign({},p,{sp:roteSpell(p.m)});roteStaffDraw([rote.target.sp],-1,[]);
-    $('roteHow').textContent=K==='sfind'?'Tap it on the neck, in the right octave.':'Press its name.';msg(K==='sfind'?'Find the note on the staff on the neck':'Name the note on the staff');
-  }
-  drawNecks();
-}
-function roteTap(v,s,f){
-  const K=rote.kind,t=rote.target;if(rote.wait||!t||!['find','sfind','same','line'].includes(K))return;
-  const m=VIOLS[violAt(v)].open[s]+f,key=hk(v,s,f);
-  if(K==='line'){roteLineTap(m,s,key);return;}
-  roteMark(K==='find'?(rote.oct?m===t.m:pc(m)===pc(t.m))&&strOk(s)&&roteRangeOk(m):K==='sfind'?m===t.m&&strOk(s):m===t.m&&key!==t.k,m,key);
-}
-function roteAnswer(p){
-  const K=rote.kind,t=rote.target;if(!rote.on||rote.wait||!t||(K!=='name'&&K!=='sname'))return;
-  roteMark(pc(t.m)===p,t.m,t.k,p);
-}
-// the right places for the note asked, in green
-function roteShow(t){
-  const K=rote.kind;
-  positions(rote.viol).filter(p=>K==='find'?(rote.oct?p.m===t.m:pc(p.m)===pc(t.m))&&strOk(p.s)&&roteRangeOk(p.m):K==='same'?p.m===t.m&&p.k!==t.k:p.m===t.m&&(K!=='sfind'||strOk(p.s))).forEach(p=>st.hl[p.k]='#6fbf73');
-}
-function roteMark(ok,m,key,pressed){
-  const t=rote.target,K=rote.kind;rote.wait=true;rote.total++;if(ok){rote.right++;rote.streak++;}else rote.streak=0;
-  st.hl={};st.hlBlank=null;
-  if(K==='name')st.hl[t.k]=ok?'#6fbf73':'#e0605a';
-  else{roteShow(t);if(K==='same')st.hl[t.k]='#d9a441';if(!ok&&key!==t.k&&K!=='sname')st.hl[key]='#e0605a';}
-  if(K==='sfind'||K==='sname')roteStaffDraw([t.sp],-1,[ok]);
-  const nm=K==='find'?t.name:t.sp?t.sp.name:spell(t.m).name;
-  $('roteHow').textContent=ok?`Right: ${nm}.`:K==='name'||K==='sname'?`Not quite: it is ${nm}, not ${NOTE_BTNS[pressed][1]}.`:`Not quite: that was ${spell(m).name}. Green shows where ${nm} is.`;
-  msg($('roteHow').textContent,ok?'ok':'bad');
-  play((K==='name'||K==='sname'?t.m:m)-neckUp(rote.viol),soundOf(rote.viol));roteScore();drawNecks();roteSaveNow();
-  setTimeout(()=>{if(rote.target===t)roteNext();},ok?700:1700);
-}
-// a line: each note in turn; a wrong one shows where it was, then the line goes on
-function roteLineTap(m,s,key){
-  const L=rote.target,n=L.line[L.cur],ok=m===n.m&&strOk(s);
-  rote.total++;if(ok){rote.right++;rote.streak++;}else rote.streak=0;
-  L.marks[L.cur]=ok;L.cur++;rote.wait=true;
-  st.hl={};if(!ok)positions(rote.viol).filter(p=>p.m===n.m&&strOk(p.s)).forEach(p=>st.hl[p.k]='#6fbf73');st.hl[key]=ok?'#6fbf73':'#e0605a';
-  $('roteHow').textContent=ok?`Right: ${n.name}.`:`Not quite: that was ${spell(m).name}; it is ${n.name}, in green.`;
-  msg($('roteHow').textContent,ok?'ok':'bad');
-  play(m-neckUp(rote.viol),soundOf(rote.viol));roteStaffDraw(L.line,L.cur,L.marks);roteScore();drawNecks();roteSaveNow();
-  const done=L.cur>=L.line.length;
-  setTimeout(()=>{if(!rote.on||rote.target!==L)return;if(done){roteNext();return;}rote.wait=false;st.hl={};drawNecks();},done?1000:ok?250:1200);
-}
-// writing on the staff: the line or space tapped, with the ♭, ♮ or ♯ chosen, makes the note
-const CLEF_TOP={alto:['G',4],tenor:['E',4],treble:['F',5],treble8:['F',4],bass:['A',3]};   // the note on the top line
-function roteAccSet(a){rote.acc=a;document.querySelectorAll('#roteAcc button').forEach(b=>b.classList.toggle('on',+b.dataset.a===a));if(roteMoving())roteMoveDraw();}
-document.querySelectorAll('#roteAcc button').forEach(b=>b.onclick=()=>roteAccSet(+b.dataset.a));
-// the note being moved on the staff: its line or space (rote.pos, counted in lines and spaces), with ♭, ♮ or ♯
-const roteTopDia=()=>{const [L,O]=CLEF_TOP[VIOLS[rote.viol].clef||st.clef]||CLEF_TOP.alto;return O*7+LET.indexOf(L);};
-function roteMovable(){const d=rote.pos,L=LET[((d%7)+7)%7],o=Math.floor(d/7),a=rote.acc;
-  return {m:12*(o+1)+BASE[L]+a,name:L+SYM[a]+o,vf:L.toLowerCase()+(a>0?'#':a<0?'b':''),oct:o,acc:a>0?'#':a<0?'b':null};}
-const roteMoveDraw=()=>roteStaffDraw([roteMovable()],0,[],true);   // (in blue while it is being moved)
-const roteMoving=()=>rote.on&&rote.kind==='nstaff'&&!rote.wait&&rote.target&&rote.pos!=null;
-function roteMove(n){if(!roteMoving())return;const top=roteTopDia(),d=rote.pos+n;if(top-d<-10||top-d>18)return;rote.pos=d;roteMoveDraw();}
-$('roteUp').onclick=()=>roteMove(1);
-$('roteDown').onclick=()=>roteMove(-1);
-// a tap on the staff moves the note near it (taps are rough on a small staff; the arrows finish the job)
-$('roteStaff').addEventListener('click',e=>{
-  if(!roteMoving()||!rote.stave)return;
-  const svg=$('roteStaff').querySelector('svg');if(!svg)return;
-  const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;const y=pt.matrixTransform(svg.getScreenCTM().inverse()).y;
-  rote.pos=roteTopDia()-Math.max(-10,Math.min(18,Math.round((y-rote.stave.getYForLine(0))/5)));roteMoveDraw();
-});
-function roteStaffCheck(){
-  if(!roteMoving())return;
-  const t=rote.target,mine=roteMovable(),ok=mine.m===t.m,letter=mine.name[0],oct=mine.oct;
-  // the right note, spelt with the letter chosen when it can be (F♯ rather than G♭ when the note is on F)
-  let right=null;for(let o=oct-1;o<=oct+1&&!right;o++){const off=t.m-(12*(o+1)+BASE[letter]);if(Math.abs(off)<=1)right={m:t.m,name:letter+SYM[off]+o,vf:letter.toLowerCase()+(off>0?'#':off<0?'b':''),oct:o,acc:off>0?'#':off<0?'b':null};}
-  if(!right)right=roteSpell(t.m);
-  rote.wait=true;rote.total++;if(ok){rote.right++;rote.streak++;}else rote.streak=0;
-  roteStaffDraw(ok?[mine]:[mine,right],-1,ok?[true]:[false,true],true);
-  st.hl={[t.k]:ok?'#6fbf73':'#e0605a'};st.hlBlank=null;
-  $('roteHow').textContent=ok?`Right: ${mine.name}.`:`Not quite: you put ${mine.name}; it is ${right.name}, in green.`;
-  msg($('roteHow').textContent,ok?'ok':'bad');
-  play(t.m-neckUp(rote.viol),soundOf(rote.viol));roteScore();drawNecks();roteSaveNow();
-  setTimeout(()=>{if(rote.target===t)roteNext();},ok?900:2200);
-}
-$('roteCheck').onclick=roteStaffCheck;
-let roteTimer=0;
-function roteStart(){
-  stopPlay();if(rec.on)stopRec();
-  if(st.mode!=='explore'){$('mode').value='explore';setMode();}   // (the quizzes in Settings use the neck too)
-  Object.assign(rote,{on:true,kind:$('roteKind').value,viol:$('roteViol').value,oct:$('roteOct').value==='1',str:+$('roteStr').value,range:$('roteRange').value,limit:+$('roteLen').value,
-    right:0,total:0,streak:0,t0:Date.now(),target:null});
-  rote.end=rote.t0+rote.limit*1000;
-  st.hideLabels=true;
-  $('roteGo').style.display='none';$('roteBar').style.display='';
-  $('roteNames').style.display=rote.kind==='name'||rote.kind==='sname'?'':'none';$('roteAcc').style.display=$('roteMove').style.display=rote.kind==='nstaff'?'':'none';$('roteMsg').textContent='A drill is running: Finish is under the neck.';
-  ['roteKind','roteViol','roteOct','roteStr','roteRange','roteLen'].forEach(id=>$(id).disabled=true);
-  openFold('pRote',false);   // (the drill runs under the neck, so the menu folds up to make room)
-  clearInterval(roteTimer);if(rote.limit)roteTimer=setInterval(()=>{if(!rote.on)return clearInterval(roteTimer);if(Date.now()>=rote.end)roteFinish();else roteScore();},250);
-  roteScore();roteNext();
-}
-function roteFinish(){
-  if(!rote.on)return;
-  clearInterval(roteTimer);
-  const r=roteNow();if(r.total)roteKeep(r);try{localStorage.removeItem('score-conv-rote-now');}catch(e){}
-  rote.on=false;rote.target=null;st.hl={};st.hlBlank=null;st.hideLabels=false;
-  $('roteGo').style.display='';$('roteBar').style.display='none';
-  ['roteKind','roteViol','roteOct','roteStr','roteRange','roteLen'].forEach(id=>$(id).disabled=false);
-  $('roteMsg').textContent=r.total?`${rote.limit?'Time is up. ':''}You got ${r.right} out of ${r.total} (${Math.round(100*r.right/r.total)}%), ${(r.secs/r.total).toFixed(1)} seconds each. It is in the record below.`:'Nothing was answered, so nothing was kept.';
-  drawNecks();roteTable();openFold('pRote',true);   // (the mark and the record)
-}
-const roteWhat=r=>(ROTE_KINDS[r.kind]||r.kind)+(r.kind==='find'&&r.oct?', with octave':'')+(r.str>=0?`, string ${r.str+1}`:'')+(ROTE_RANGES[r.range]?', '+ROTE_RANGES[r.range]:'')+(r.limit?`, ${r.limit/60} min`:'');
-function roteTable(){
-  const l=roteLog(),T=$('roteLog');
-  if(!l.length){T.innerHTML='<p class="score">No rounds yet.</p>';$('roteClear').style.display='none';return;}
-  const two=n=>String(n).padStart(2,'0'),dur=s=>s>=60?`${Math.floor(s/60)} min ${two(s%60)} s`:`${s} s`;
-  T.innerHTML='<table><tr><th>Date</th><th>Time</th><th>Drill</th><th>Viol</th><th>Mark</th><th>Took</th><th>Each</th></tr>'+l.slice(0,300).map(r=>{const d=new Date(r.at);
-    return `<tr><td>${d.toLocaleDateString()}</td><td>${two(d.getHours())}:${two(d.getMinutes())}</td><td>${roteWhat(r)}</td>`+
-      `<td>${VIOLS[r.viol]?VIOLS[r.viol].name:''}</td><td><b>${r.right}/${r.total}</b> (${Math.round(100*r.right/r.total)}%)</td><td>${dur(r.secs||0)}</td><td>${r.total?((r.secs||0)/r.total).toFixed(1)+' s':''}</td></tr>`;}).join('')+'</table>';
-  $('roteClear').style.display='';
-}
-// the strings of the viol chosen, to keep a drill to one of them
-function roteStrings(){const S=$('roteStr'),keep=S.value;S.innerHTML='<option value="-1">all</option>'+VIOLS[$('roteViol').value].open.map((o,i)=>`<option value="${i}">${i+1} (${strName(o)})</option>`).join('');S.value=[...S.options].some(o=>o.value===keep)?keep:'-1';}
-function roteKindUI(){
-  const k=$('roteKind').value,rg=$('roteRange').value;$('roteOctL').style.display=k==='find'?'':'none';
-  $('roteInfo').textContent=ROTE_INFO[k]+(rg==='low'||rg==='high'||rg==='ledger'?' '+ledgerGuide($('roteViol').value,rg):'');   // (where those notes are written)
-}
-$('roteGo').onclick=roteStart;
-$('roteEnd').onclick=roteFinish;
-$('roteKind').onchange=roteKindUI;
-$('roteViol').onchange=()=>{roteStrings();roteKindUI();};
-$('roteRange').onchange=roteKindUI;
-$('roteClear').onclick=()=>{const n=roteLog().length;if(n&&confirm(`Delete all ${n} rounds in the record? This cannot be undone.`)){try{localStorage.removeItem('score-conv-rote');}catch(e){}roteTable();}};
-roteStrings();roteKindUI();
-// a round that was going when the page was closed (or reloaded) goes into the record
-try{const left=JSON.parse(localStorage.getItem('score-conv-rote-now')||'null');if(left&&left.total)roteKeep(left);localStorage.removeItem('score-conv-rote-now');}catch(e){}
-roteTable();
+// (no drills here)
+const roteFinish=()=>false;
+const roteKindUI=()=>false;
+const roteMove=()=>false;
+const roteMoving=()=>false;
+const roteRangeOk=()=>false;
+const roteStaffCheck=()=>false;
+const roteStrings=()=>false;
+const roteTap=()=>false;
 buildPalette();buildAnswerUI();setMode();buildParts();drawRecording();
-stat('Pick a rhythm, then click notes on the neck. Click a note in the score to select and edit it.');
+stat('Open a score to begin.');
 // The score is kept on this device: every little while, and whenever you leave the page. An iPad often reloads a page
 // you come back to, so the score you had comes back with it.
 let savedJson='';
@@ -2613,38 +2138,6 @@ function leavePage(stopAll){
 document.addEventListener('visibilitychange',()=>{if(document.hidden)leavePage(IOS);});   // (a computer may play on in a hidden tab)
 addEventListener('pagehide',()=>leavePage(true));
 addEventListener('pageshow',e=>{if(!e.persisted)return;audioWoken=false;drawNecks();keepScroll(drawRecording);fitFold();followUI();});
-</script>
-<div id="advice" role="status" aria-live="polite"><button id="adviceX" title="Hide (it comes back when you press Play)">×</button><h4 id="adviceHead" title="Drag to move">Practice advice</h4><div id="adviceTxt"></div><textarea id="adviceBank" style="display:none" aria-label="Advice bank, one tip per line"></textarea><div class="arow"><input id="adviceNew" placeholder="Add a tip…" maxlength="200"><button id="adviceAdd">Add</button><select id="adviceSec" title="Seconds between tips"><option value="2">2s</option><option value="3">3s</option><option value="5">5s</option><option value="8">8s</option><option value="10">10s</option><option value="15">15s</option><option value="20">20s</option><option value="30">30s</option><option value="60">60s</option></select><button id="adviceEdit">Edit bank</button></div></div>
-<script>
-const ADVICE_DEFAULT=['Posture should be straight.','Your elbows should be hanging.','Shoulders down.','Left fingers should stay down when another note is added on the same string.','Left hand thumb stays behind second finger.','Left hand thumb stays below the middle line of the back of the neck.','Breathe.','Check your bow is straight.','Check there is no claw.','Use tip of bow.','Relax bow hand.','Feet flat.','Make sure bow is above knees.','Middle finger through the string.','Play on the left edge of the fret.','Curved left hand fingers, in a C shape.'];
-let ADVICE=ADVICE_DEFAULT.slice(),adviceI=0,adviceT=null,adviceSecs=5;
-try{const n=+localStorage.getItem('adviceSecs');if(n>=1&&n<=600)adviceSecs=n;}catch(e){}
-const adviceBox=$('advice');
-try{const b=JSON.parse(localStorage.getItem('score-conv-advice'));if(Array.isArray(b)&&b.length)ADVICE=b.map(x=>String(x).slice(0,200));}catch(e){}
-function adviceSave(){try{localStorage.setItem('score-conv-advice',JSON.stringify(ADVICE));}catch(e){}}
-function adviceShow(){$('adviceTxt').textContent=ADVICE[adviceI%ADVICE.length]||'';}
-function adviceStart(){adviceBox.classList.remove('hide');if(adviceT)return;adviceShow();adviceT=setInterval(()=>{if($('adviceBank').style.display==='none'){adviceI++;adviceShow();}},adviceSecs*1000);}
-function adviceStop(){}   // the advice keeps cycling whether or not the music is playing
-{const S=$('adviceSec');if(![...S.options].some(o=>+o.value===adviceSecs)){const o=document.createElement('option');o.value=adviceSecs;o.textContent=adviceSecs+'s';S.append(o);}S.value=adviceSecs;
-S.onchange=()=>{adviceSecs=+S.value;try{localStorage.setItem('adviceSecs',adviceSecs);}catch(e){}clearInterval(adviceT);adviceT=null;adviceStart();};}
-$('adviceX').onclick=()=>adviceBox.classList.add('hide');
-$('adviceAdd').onclick=()=>{const v=$('adviceNew').value.trim();if(!v)return;ADVICE.push(v.slice(0,200));adviceSave();$('adviceNew').value='';adviceI=ADVICE.length-1;adviceShow();};
-$('adviceNew').onkeydown=e=>{if(e.key==='Enter')$('adviceAdd').onclick();e.stopPropagation();};
-$('adviceEdit').onclick=()=>{const T=$('adviceBank'),editing=T.style.display!=='none';
-  if(editing){const l=T.value.split('\n').map(x=>x.trim().slice(0,200)).filter(Boolean);ADVICE=l.length?l:ADVICE_DEFAULT.slice();adviceSave();T.style.display='none';$('adviceTxt').style.display='';$('adviceEdit').textContent='Edit bank';adviceI=0;adviceShow();}
-  else{T.value=ADVICE.join('\n');T.style.display='';$('adviceTxt').style.display='none';$('adviceEdit').textContent='Save bank';T.focus();}};
-$('adviceBank').onkeydown=e=>e.stopPropagation();
-// drag by the title; remember position and size
-(function(){const H=$('adviceHead');let d=null;
-  const keep=()=>{try{const r=adviceBox.getBoundingClientRect();localStorage.setItem('advicePos',JSON.stringify({l:r.left,t:r.top,w:r.width,h:r.height}));}catch(e){}};
-  const place=(l,t)=>{adviceBox.style.right='auto';adviceBox.style.bottom='auto';adviceBox.style.left=Math.max(0,Math.min(innerWidth-60,l))+'px';adviceBox.style.top=Math.max(0,Math.min(innerHeight-40,t))+'px';};
-  try{const p=JSON.parse(localStorage.getItem('advicePos'));if(p){adviceBox.style.width=p.w+'px';adviceBox.style.height=p.h+'px';place(p.l,p.t);}}catch(e){}
-  H.addEventListener('pointerdown',e=>{const r=adviceBox.getBoundingClientRect();d={x:e.clientX-r.left,y:e.clientY-r.top};H.setPointerCapture(e.pointerId);});
-  H.addEventListener('pointermove',e=>{if(d)place(e.clientX-d.x,e.clientY-d.y);});
-  H.addEventListener('pointerup',()=>{if(d){d=null;keep();}});
-  if(window.ResizeObserver)new ResizeObserver(()=>{if(adviceBox.style.left)keep();}).observe(adviceBox);
-})();
-adviceStart();
 </script>
 </body>
 </html>

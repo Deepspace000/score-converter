@@ -1,46 +1,29 @@
 # Score Converter
 
-Upload printed sheet music (a PDF or a picture) and it becomes a score you can play back, change and export. It began as a viol trainer (Tenor Viol Clef Trainer, then Goat Viols) and keeps all of that: the viol necks, the drills and the consort player.
-
-What the reader takes from a page:
-
-- Single lines, consort scores, choir staves with two voices each, and voice or solo instrument with piano (the piano's two staves are found by their brace).
-- Chords, two voices on one staff (stems up and stems down), ties, dotted notes, rests, triplets, notes down to demisemiquavers, pickup bars, repeats and endings.
-- Key and time signatures (2/4, 3/4, 4/4, 6/8, 12/8, C and cut C among them), sharps, flats and naturals as printed.
-- Staccato, tenuto, accent and pause signs; dynamics (pp to ff); slurs.
-
-What it gives back: the score drawn again in the same layout of staves and voices, playback with a piano sound and loud and soft, and export as MIDI, MusicXML (for MuseScore, Sibelius, Dorico, Finale), PDF or its own .json.
-
-Not read yet: grace notes, trills and other ornaments, clef changes inside a line, beams that cross from one staff to the other, pedal marks, hairpins, lyrics. Old engraved editions and small or blurred scans read much worse than modern computer-set PDFs; bars that do not add up are shaded red on the page so you can check them.
-
-- The look: a medieval page of dark oak, parchment and gilding. Each neck is wood with its own grain and shade, with seven gut frets tied round it (as on a real viol), a bone nut and gut strings.
-- The score looks like the printed edition: a white page, Times lettering, each piece's title with the composer under it, C and cut C as printed, bar numbers at the start of each line, and (Notes > Lines as printed) the same lines as the PDF.
-- Your score is kept on the device you use: leave the page (another tab, app or site) and come back, or reload it, and the score is as you left it. On an iPad the music stops while you are away, and the first tap back wakes the sound again.
-- The notes of the piece: on each neck, every note its part plays in the piece in view (the one playing, the selected note's, or the one at the top of the score) is ringed in the viol's colour and glows, brightest where the part spends most of its time (its tessitura); the other notes step back a little.
-- Notes shown (Settings): each note on the neck low and high (every place it can be played), only low (open strings first), or only high on the neck.
+Open printed music and get a score you can play, change and save.
 
 Open it here: https://deepspace000.github.io/score-converter/
 
-- One screen: the viol necks at the top, the score underneath scrolling in its own box, and fold-down menus (Practise, Notes, Parts, File, Settings, About). Drag the bar between the necks and the score to give either more room (double-click it to go back). Score size (in Notes) makes the music bigger or smaller.
-- The viol neck with every note named. Tap a note to hear it and see it on the staff.
-- Treble, tenor and bass viol necks: show any of them (Settings). They sit side by side when there is room. A note tapped on the bass or treble neck is shown on the staff in that viol's clef.
-- Quizzes: find a staff note on the neck, name a note on the neck, name a note on the staff.
-- Rote (menu): seven drills on the tenor (or treble or bass) viol neck, run in a strip under the neck. Name shown: tap it on the neck (any octave, or with the octave). Note on the neck: press its name from the twelve. Note on the neck: put it on the staff (a note starts somewhere else on the staff; move it with Up and Down a line or space at a time, choose ♭ or ♯ if it needs one, then Check; a tap on the staff only moves the note near it). Note on the staff: tap it on the neck in the right octave. Note on the staff: press its name. Line on the staff: play six notes on the neck one after another. Same note, another place on the neck. The staff is in the viol's clef (alto clef for the tenor); Staff − and Staff + in the strip make it smaller or bigger (remembered). A round goes on until Finish or for 1, 2 or 5 minutes, and can keep to one string. Each round is kept in a record with its date, time, mark, length and seconds per answer, on this device; a round left unfinished is kept too.
-- Low and high notes (the ledger lines): every Rote drill can keep to the notes below the staff, above it, both, or on it, with a guide to where each one is written (for the tenor viol in alto clef: G2, the open 6th string, on ledger line 3 below; C3, the open 5th string, in the space under ledger line 1; D5 on ledger line 2 above). Practise has eight exercises for them: step down (or up) from the staff and back, leaps from the bottom (or top) line, the ledger lines and then the spaces, and a note on the staff with its octave below (or above).
-- Practise: open strings, major and minor scales (natural, harmonic, melodic), chromatic scale, arpeggios, scales in thirds, frets 0 to 4 on each string, and string crossing, from any starting note, in one or two octaves, written into the score to play along with.
-- Any key signature, and alto, tenor, octave treble, treble or bass clef.
-- A score you write by tapping the neck: breve, semibreve, minim, crotchet, quaver and semiquaver, with dots, rests, ties across bar lines, any time signature (4/1, 6/2, 4/2, 3/4 ...) and tempo. Play it back, save it as .json and load it again, or save it as a PDF.
-- Note names and movable-do sol-fa under every note. The note that is playing lights up in the score and on the neck.
-- Record from a microphone: the notes you play on the viol are written into the score.
-- Import MIDI, MusicXML, or printed music as a PDF or picture. Printed music is read on the page itself: notes, rests, rhythms, dots, ties, bar lines, clefs, key and time signatures (also C and cut C), accidentals, repeat signs and first and second endings. The key signature of each piece is worked out from every staff of the piece and checked against the accidentals in the music.
-- Full scores: every staff of a system becomes a part (treble, tenor and bass viols, two trebles and a bass, or any other line-up), each in its own clef. Every part has mute, solo, volume, pan and a violin, viola or cello sound, with reverb over all of them. The parts are kept together bar by bar, and play with their repeats and endings. Play from the start, from any piece, repeated section or ending, from any bar, or from a selected note.
-- All parts: every part's staff together, bar by bar, with the parts' names; or one part at a time. Click a note or a name to choose the part you work on.
-- Neck shows (toolbar): the part whose notes light up on the neck while the music plays, on its viol's neck (or on the tenor neck when that one is hidden). Or "Every part, a neck each": one neck for every part, named after it and tuned like its viol (Viol, per part, under Parts), each lighting up with its part; a tap on a part's neck writes into that part. The playing notes light up big and the other dots dim.
-- Each viol has its own colour wherever its parts appear: treble (soprano) yellow, tenor gold, bass purple. The necks are labelled with their name and tuning in that colour, their notes light up in it, the note playing in the score gets a highlighter mark in it, and the parts' names are written in it.
-- Follow score: the score keeps the music that is playing in view, and the line that plays moves to the top. Scrolling the score by hand pauses it; press Follow score to go back to the music.
+## What it does
 
-Keys: left and right arrows move from note to note in the score, up and down change the rhythm, 1 to 6 pick a rhythm, `.` adds a dot, R adds a rest, Backspace deletes.
+- **Open a score**: a PDF or a picture of printed music, or a MusicXML, MIDI or saved score file. Press **Open score** or drop the file on the page.
+- **Play it**: every part together, with mute, solo, volume, pan and sound for each part. Start from any bar. The score follows the music.
+- **Change the tempo**: the Tempo box (a printed metronome mark sets it when the score is read).
+- **Change the notes**: click a note, then use the arrow keys or the buttons under **Edit** to change its pitch or rhythm, delete it, or add notes and rests. Key, time signature and title can be changed too.
+- **Save it**: **Save score** keeps everything in one file to open again later. Export as MIDI, MusicXML or PDF.
 
-Tenor viol tuning: G2 C3 F3 A3 D4 G4 (a fourth above the bass viol). For a tenor viol tuned in E (E2 A2 D3 F♯3 B3 E4, a minor third lower, like a guitar with its G string at F♯), choose under Settings > Tenor viol tuned either "notes where they sound" (the neck shows the real notes of the viol in E) or "with G fingering": you finger as on a viol in G, the tenor part is written a minor third higher (like a part for a clarinet in A), the neck shows the G fingering with the written names, and every sound is the viol's real sound, so you play in tune with the app and the other parts. The neck can show up to 12 places on each string (the seven tied frets, then bare fingerboard), for high notes.
+The reader handles scores with several staves, piano parts with chords and two voices, lyrics, slurs, ties, dynamics, hairpins and tempo words. Everything runs in the browser; nothing is uploaded.
 
-Uses [VexFlow](https://github.com/0xfe/vexflow) (MIT) for the staves and [PDF.js](https://github.com/mozilla/pdf.js) (Apache 2.0) to open PDFs.
+## Keys
+
+| Key | Does |
+| --- | --- |
+| Space | Play / stop |
+| Left / right arrow | Previous / next note |
+| Up / down arrow | Selected note up / down a step in the key (with Shift: a semitone) |
+| 1 to 6 | Rhythm: breve, semibreve, minim, crotchet, quaver, semiquaver |
+| . | Dot |
+| A to G | Add a note |
+| R | Add a rest |
+| Delete | Delete the selected note |
+| Ctrl+Z | Undo |
