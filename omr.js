@@ -217,6 +217,7 @@ function analyzeBitmap(imgData, opts){
     let lastX = -1; const keyAccs = [];
     for (const c of cands) {
       if (lastX >= 0 && c.minx - lastX > 1.4 * p) break;                       // past the key signature
+      if (opts.thickLedger && lastX < 0 && c.minx - zone > 2.4 * p) break;      // (a key signature starts right after the clef: this is a note's own sign further on)
       const paired = comps.some(o => o !== c && Math.min(o.maxx, c.maxx) - Math.max(o.minx, c.minx) > 0.5 * c.w && (o.miny > c.maxy || o.maxy < c.miny) && Math.abs((o.miny > c.maxy ? o.miny - c.maxy : c.miny - o.maxy)) < 0.6 * p);
       if (paired) break;                                                        // time-signature digits
       // sharp: a stroke runs nearly the full height in the right third of the glyph. Flat: only the loop is there.
@@ -1081,6 +1082,59 @@ function omrReadPage(imgData, again) {
     const lastBar = bars[bars.length - 1];
     const endsFinal = !!lastBar && lastBar.x1 - lastBar.x0 + 1 >= 0.3 * p && lastBar.x1 >= st.right - 0.8 * p && !(barRep.length && barRep[barRep.length - 1].end);
 
+    // ---------- a change of clef inside the line ----------
+    const clefBoxes = []; st.clefCh = [];
+    if (again) {
+      const ya = Math.max(0, Math.round(st.top - 2.4 * p)), yb = Math.min(H - 1, Math.round(st.bot + 2.4 * p));
+      const xa = Math.max(0, Math.round(st.musicStart + 1.5 * p)), xb = Math.min(W - 1, Math.round(st.right + 0.3 * p));
+      const cw = xb - xa + 1, ch = yb - ya + 1;
+      if (cw > 4 && ch > 4) {
+        const sn = new Uint8Array(cw * ch), stk = [];
+        const inkIn = (bx0, bx1, by0, by1) => { let n = 0; for (let y = Math.round(by0); y <= Math.round(by1); y++) for (let x = Math.round(bx0); x <= Math.round(bx1); x++) if (x >= 0 && x < W && y >= 0 && y < H && clean[y * W + x]) n++; return n; };
+        for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) {
+          if (sn[y * cw + x] || !filled[(y + ya) * W + x + xa]) continue;
+          let minx = x, maxx = x, miny = y, maxy = y, area = 0; const pix = []; stk.length = 0; stk.push(y * cw + x); sn[y * cw + x] = 1;
+          while (stk.length) { const q = stk.pop(), px = q % cw, py = (q - px) / cw; area++; if (pix.length < 60000) pix.push(q);
+            if (px < minx) minx = px; if (px > maxx) maxx = px; if (py < miny) miny = py; if (py > maxy) maxy = py;
+            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = px + dx, ny = py + dy; if (nx < 0 || ny < 0 || nx >= cw || ny >= ch) continue; const j = ny * cw + nx; if (!sn[j] && filled[(ny + ya) * W + nx + xa]) { sn[j] = 1; stk.push(j); } } }
+          const w = maxx - minx + 1, h = maxy - miny + 1, X0 = minx + xa, X1 = maxx + xa, Y0 = miny + ya, Y1 = maxy + ya;
+          let type = null;
+          if (h >= 4.6 * p && h <= 7.8 * p && w >= 1.3 * p && w <= 3.1 * p && Y0 <= st.top - 0.3 * p && Y1 >= st.bot + 0.3 * p && area >= 0.3 * w * h) {
+            // a G clef: its upright stroke runs through the middle of the sign for nearly its whole height
+            const col = new Uint16Array(w); for (const q of pix) col[q % cw - minx]++;
+            let best = 0; for (let c = Math.round(0.3 * w); c <= Math.round(0.75 * w) && c < w; c++) if (col[c] > best) best = col[c];
+            if (best >= 0.72 * h) type = 'treble';
+          } else if (h >= 2.0 * p && h <= 3.6 * p && w >= 1.4 * p && w <= 2.9 * p && Math.abs(Y0 - st.top) <= 0.5 * p && area >= 0.28 * w * h && area <= 0.8 * w * h) {
+            // an F clef: two dots after it, in the top two spaces
+            // (the dots may count as part of the shape, so look from just inside its right edge; not as far as a bar line after it)
+            const need = 0.05 * p * p, xs = X1 - 0.4 * p, xe = Math.min(X1 + 0.75 * p, st.right - 0.4 * p);
+            if (inkIn(xs, xe, st.top + 0.2 * p, st.top + 0.8 * p) >= need && inkIn(xs, xe, st.top + 1.2 * p, st.top + 1.8 * p) >= need &&
+                inkIn(xs, xe, st.top + 0.88 * p, st.top + 1.12 * p) < 0.5 * need && inkIn(xs, xe, st.top + 2.2 * p, st.bot + 0.3 * p) < need) type = 'bass';
+          }
+          if (!type) continue;
+          const bx = [X0 - 0.3 * p, X1 + (type === 'bass' ? 1.2 : 0.3) * p]; clefBoxes.push(bx); st.clefCh.push({ x: X1, t: type });
+          for (const list of [elems, pe]) for (let i = list.length - 1; i >= 0; i--) if (list[i].x >= bx[0] && list[i].x <= bx[1]) list.splice(i, 1);
+        }
+        // A G clef that touches a beam or a tie is not a shape of its own. It is still found by its upright stroke, which
+        // runs from above the staff to below it, with the round belly on both sides of it around the second line up.
+        {
+          const yT = Math.round(st.top - 0.55 * p), yB = Math.round(st.bot + 0.55 * p), rr = Math.round(0.35 * p);
+          const F = (x, y) => x >= 0 && x < W && y >= 0 && y < H && filled[y * W + x];
+          for (let x = xa + Math.round(1.2 * p); x <= xb - Math.round(1.2 * p); x++) {
+            if (clefBoxes.some(b => x >= b[0] && x <= b[1])) continue;
+            let n = 0, tot = 0; for (let y = yT; y <= yB; y++) { tot++; let hit = false; for (let d = -rr; d <= rr && !hit; d++) if (F(x + d, y)) hit = true; if (hit) n++; }
+            if (n < 0.92 * tot) continue;
+            let ok = 0, rows = 0;
+            for (let y = Math.round(st.top + 2.3 * p); y <= Math.round(st.top + 3.7 * p); y++) { rows++; if (!F(x, y)) continue; let l = 0, r = 0; while (l < 1.6 * p && F(x - l - 1, y)) l++; while (r < 1.6 * p && F(x + r + 1, y)) r++;
+              if (l >= 0.4 * p && r >= 0.4 * p && l + r >= 1.2 * p && l + r <= 2.7 * p) ok++; }
+            if (ok < 0.5 * rows) continue;
+            const bx = [x - 1.15 * p, x + 1.4 * p]; clefBoxes.push(bx); st.clefCh.push({ x: x + 1.2 * p, t: 'treble' });
+            for (const list of [elems, pe]) for (let i = list.length - 1; i >= 0; i--) if (list[i].x >= bx[0] && list[i].x <= bx[1]) list.splice(i, 1);
+          }
+        }
+        st.clefCh.sort((a, b) => a.x - b.x);
+      }
+    }
     // ---------- rests ----------
     const y0 = Math.max(0, Math.round(st.top - 0.35 * p)), y1 = Math.min(H - 1, Math.round(st.bot + 0.35 * p));
     const x0 = Math.max(0, Math.round(st.musicStart)), x1 = Math.min(W - 1, Math.round(st.right));
@@ -1099,7 +1153,17 @@ function omrReadPage(imgData, again) {
         const cx = minx + x0 + w / 2, cy = miny + y0 + h / 2, top = miny + y0, bot = maxy + y0;
         if (heads.some(n => n.x >= minx + x0 - 0.3 * p && n.x <= maxx + x0 + 0.3 * p && n.y >= top - 0.3 * p && n.y <= bot + 0.3 * p)) continue;
         if (acc.some(c => c.minx <= maxx + x0 && c.maxx >= minx + x0 && c.miny <= bot && c.maxy >= top)) continue;
+        if (clefBoxes.some(b => cx >= b[0] && cx <= b[1])) continue;
         let d = null;
+        // Rests with little flags (quaver, semiquaver, demisemiquaver): a thin slanting stem, bare at its foot, with one
+        // round end for each flag. (A crotchet rest ends in a broad hook.)
+        let flags = 0;
+        if (again && h >= 1.2 * p && h <= 4.6 * p && w >= 0.45 * p && w <= 1.6 * p && fill < 0.75) {
+          const rows = []; for (let yy = miny; yy <= maxy; yy++) { let n = 0; for (let xx = minx; xx <= maxx; xx++) if (filled[(yy + y0) * W + xx + x0]) n++; rows.push(n); }
+          const nb = Math.max(2, Math.round(0.2 * h)); let thin = true, any = false;
+          for (let r = rows.length - nb; r < rows.length; r++) { if (rows[r] > 0.4 * p) thin = false; if (rows[r]) any = true; }
+          if (thin && any) { let inRun = false; for (const n of rows) { if (!n) continue; if (n >= 0.5 * p) { if (!inRun) { flags++; inRun = true; } } else inRun = false; } }
+        }
         const l2 = st.top + p, l3 = st.top + 2 * p;
         const onLine = y => { const r = (y - st.top) / p; return Math.abs(r - Math.round(r)) <= 0.3; };
         // several bars' rest: a thick bar across the middle line with the number of bars printed above
@@ -1112,7 +1176,9 @@ function omrReadPage(imgData, again) {
         else if (h >= 0.25 * p && h <= 0.8 * p && w >= 0.65 * p && w <= 1.7 * p && fill >= 0.75) {
           if (Math.abs(top - l2) <= 0.3 * p) d = 64; else if (Math.abs(bot - l3) <= 0.3 * p) d = 32;
           else if (Math.abs(top - l3) <= 0.3 * p) d = 64;        // (some programs hang the semibreve rest from the middle line)
-        } else if (h >= 2.2 * p && h <= 3.5 * p && w >= 0.45 * p && w <= 1.4 * p && fill < 0.75) d = 16;
+        } else if (flags >= 3 && h >= 3.0 * p) d = 2;
+        else if (flags === 2 && h >= 2.0 * p && h <= 3.6 * p) d = 4;
+        else if (h >= 2.2 * p && h <= 3.5 * p && w >= 0.45 * p && w <= 1.4 * p && fill < 0.75) d = 16;
         else if (h >= 1.2 * p && h < 2.2 * p && w >= 0.5 * p && w <= 1.3 * p && fill < 0.75 && cy > st.top + 0.6 * p && cy < st.bot - 0.4 * p) d = 8;
         if (d == null) continue;
         let dotted = false; for (const dy of [0, -0.5, 0.5]) if (hasDot(minx + x0 + w * 0.6, cy + dy * p, p)) dotted = true;
@@ -1189,7 +1255,7 @@ function omrReadPage(imgData, again) {
       });
     }
     out.staves.push({ p, left: st.left, right: st.right, top: st.top, bot: st.bot, fifths, keyBox: accs.length ? [accs[0].minx, accs[accs.length - 1].maxx] : null, droppedAcc: !!dropped, musicStart: st.musicStart, barX, barRep, elems, totals, acc, ts, tsC, endsFinal,
-      clefType: st.clefType || null, sys: sysOf[si], pos: posOf[si], sysSize: sizeOf[si], voltas, pe, linkDn, kb: null, poly: false, tsBox: st.tsBox || null });
+      clefType: st.clefType || null, sys: sysOf[si], pos: posOf[si], sysSize: sizeOf[si], voltas, pe, linkDn, kb: null, poly: false, tsBox: st.tsBox || null, clefCh: st.clefCh || [] });
   });
   // the staves of one system share the endings drawn over its top staff, and its time signature
   const bySys = {};
@@ -1783,7 +1849,8 @@ function omrPolyItems(pages, plan, clef, fifthsOverride, barT) {
             if (e.kind !== 'note') continue;
             e.ms = []; e.tnm = []; e.sp = {};
             for (const h of e.notes) {
-              const dia = topDia - h.step, letter = OMR_LET[((dia % 7) + 7) % 7], oct = Math.floor(dia / 7);
+              let tD = topDia; for (const c of (st.clefCh || [])) if (c.x < e.x && OMR_TOPDIA[c.t]) tD = OMR_TOPDIA[c.t];
+              const dia = tD - h.step, letter = OMR_LET[((dia % 7) + 7) % 7], oct = Math.floor(dia / 7);
               let off = keyOff[letter];
               if (h.accOff != null) { off = h.accOff; carry[dia] = off; } else if (carry[dia] != null) off = carry[dia];
               let m = 12 * (oct + 1) + OMR_BASE[letter] + off;

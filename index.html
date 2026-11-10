@@ -118,7 +118,13 @@ span.pname{min-width:0;color:var(--dim)}
     <label title="Make the music bigger or smaller">Size <input type="range" id="zoom" min="0.6" max="1.6" step="0.05" value="1" style="width:110px"></label>
     <label title="Begin each line of music where the printed score began it"><input type="checkbox" id="origChk" checked> Lines as printed</label>
   </div>
-  <div class="hint">Click a note in the score to select it. Arrows left and right move between notes, up and down change its pitch, 1 to 6 set its rhythm, the letters A to G add a note, R adds a rest.</div>
+  <div class="controls">
+    <label>Transpose <select id="trAmt"></select></label>
+    <select id="trWhat" title="What moves"><option value="both">score and sound</option><option value="score">score only (the sound stays)</option><option value="sound">sound only (the score stays)</option></select>
+    <button id="trGo">Transpose</button>
+    <span class="score" id="trNow"></span><button id="trReset" style="display:none" title="Play the notes as they are written">Sound as written</button>
+  </div>
+  <div class="hint">Drag a note up or down on the staff to change its pitch. Click a note in the score to select it. Arrows left and right move between notes, up and down change its pitch, 1 to 6 set its rhythm, the letters A to G add a note, R adds a rest.</div>
 </div>
 
 <div class="foldp" id="pParts"><div id="partsBar"></div></div>
@@ -126,10 +132,11 @@ span.pname{min-width:0;color:var(--dim)}
 <div class="foldp" id="pFile">
   <div class="controls">
     <button id="expBtn" class="primary" title="Everything, to open again here later">Save score</button>
-    <button id="midBtn" title="A MIDI file, for a sequencer or another music program">Export MIDI</button>
+    <button id="midBtn" title="A MIDI file of the parts ticked below, for a sequencer or another music program">Export MIDI</button>
     <button id="xmlBtn" title="A MusicXML file, for MuseScore, Sibelius, Dorico, Finale ...">Export MusicXML</button>
     <button id="pdfBtn" title="Opens the print dialog: choose Save as PDF">Export PDF</button>
   </div>
+  <div class="controls"><span class="score">Parts in the MIDI file:</span><span id="midParts" class="controls"></span><button id="midAll">All parts</button><button id="midPiano">Piano only</button></div>
   <div class="hint">The score is also kept on this device, so it is still here when you come back.</div>
 </div>
 
@@ -142,6 +149,7 @@ span.pname{min-width:0;color:var(--dim)}
     <button id="scPrev">‹</button><span id="scPage" class="score">Page 1 / 1</span><button id="scNext">›</button>
     <button id="scAll" class="primary">Read all pages</button>
     <button id="scRead">Read this page only</button>
+    <label title="For example 5-6, or 2,4-6">Pages <input type="text" id="scPages" placeholder="e.g. 5-6" style="width:86px"></label><button id="scSome">Read these pages</button>
     <label title="Tick this if the key signature was read wrongly: choose the right key under Edit first"><input type="checkbox" id="scKey"> Use the key chosen under Edit</label>
     <button id="pdfClose">Close</button>
   </div>
@@ -151,7 +159,7 @@ span.pname{min-width:0;color:var(--dim)}
 </div>
 
 <script src="vexflow.js"></script>
-<script src="omr.js?v=2.3"></script>
+<script src="omr.js?v=2.4"></script>
 <script>
 const {Renderer,Stave,StaveNote,Voice,Formatter,Accidental,Dot,Beam,StaveTie,Barline,Volta,GhostNote,StaveConnector,Tuplet,Fraction,Articulation,Curve,GraceNote,GraceNoteGroup,Glyph} = Vex.Flow;
 // (parts of the page that are not there answer with a stand-in, so nothing depends on them)
@@ -159,7 +167,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.0';
+const APP_VERSION='5.1';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -319,8 +327,29 @@ const INST={
   violin:{lp:[8,7000],body:[[480,1.4,5],[2900,1.6,6]],vib:[5.8,11],att:0.05,gain:0.15},
   viola: {lp:[7,5000],body:[[350,1.3,5],[1700,1.4,5]],vib:[5.3,10],att:0.07,gain:0.17},
   cello: {lp:[6,3500],body:[[210,1.2,6],[750,1.4,4]],vib:[4.9,9],att:0.09,gain:0.2},
-  piano: {lp:[7,5200],body:[[260,1,2]],vib:[5,0],att:0.006,gain:0.2,pluck:true}   // struck, then dying away
+  piano: {lp:[7,5200],body:[[260,1,2]],vib:[5,0],att:0.006,gain:0.2,pluck:true},   // struck, then dying away
+  // (wave: the kind of wave, a sawtooth unless given; det: one voice for each number, so much out of tune; decay: how
+  //  fast a struck or plucked note dies away; noise: breath)
+  pianoBright:{lp:[12,9000],body:[[320,1,2],[2600,1.2,4]],vib:[5,0],att:0.004,gain:0.195,pluck:true,decay:1.3},
+  pianoSoft:{lp:[4,2400],body:[[220,1,3]],vib:[5,0],att:0.015,gain:0.19,pluck:true,decay:2.0},
+  pianoUpright:{lp:[6,4200],body:[[300,1.2,3],[1200,1.5,-3]],vib:[5,0],att:0.006,gain:0.22,pluck:true,decay:1.1,det:[-9,7]},
+  epiano:{lp:[6,3600],body:[[400,1,2]],vib:[5.5,3],att:0.005,gain:0.15,pluck:true,decay:1.8,wave:'triangle',det:[-3,3]},
+  harpsichord:{lp:[16,10000],body:[[900,1.2,4],[3200,1.5,5]],vib:[5,0],att:0.002,gain:0.17,pluck:true,decay:0.55},
+  choirAah:{lp:[6,4200],body:[[800,4,12],[1150,5,8],[2900,6,7]],vib:[5.2,14],att:0.14,gain:0.11,det:[-11,-4,5,12]},
+  choirOoh:{lp:[4,2600],body:[[350,4,12],[750,5,7],[2600,6,4]],vib:[5.0,12],att:0.16,gain:0.12,det:[-11,-4,5,12]},
+  choirMm:{lp:[2.5,1300],body:[[280,3,9]],vib:[4.8,10],att:0.18,gain:0.13,det:[-10,-3,4,11]},
+  flute:{lp:[3.5,5000],body:[[1500,1.2,3]],vib:[5.2,9],att:0.07,gain:0.23,wave:'triangle',det:[0],noise:0.5},
+  recorder:{lp:[5,6000],body:[[2000,1.5,3]],vib:[5,3],att:0.04,gain:0.15,wave:'triangle',det:[-2,2],noise:0.25},
+  oboe:{lp:[9,6500],body:[[1100,4,12],[2900,5,9]],vib:[5.5,7],att:0.04,gain:0.22,det:[0]},
+  clarinet:{lp:[6,4500],body:[[1500,2,4]],vib:[5,3],att:0.05,gain:0.155,wave:'square',det:[0]},
+  bassoon:{lp:[7,2800],body:[[480,3,10],[1200,3,4]],vib:[5,4],att:0.05,gain:0.115,det:[-2,2]}
 };
+const SOUNDS=[['Keyboards',[['piano','Grand piano'],['pianoBright','Bright piano'],['pianoSoft','Soft piano'],['pianoUpright','Upright piano'],['epiano','Electric piano'],['harpsichord','Harpsichord']]],
+  ['Voices',[['choirAah','Choir, aah'],['choirOoh','Choir, ooh'],['choirMm','Choir, humming']]],
+  ['Woodwind',[['flute','Flute'],['recorder','Recorder'],['oboe','Oboe'],['clarinet','Clarinet'],['bassoon','Bassoon']]],
+  ['Strings',[['violin','Violin'],['viola','Viola'],['cello','Cello']]]];
+const GM_PROG={piano:0,pianoBright:1,pianoSoft:0,pianoUpright:3,epiano:4,harpsichord:6,choirAah:52,choirOoh:53,choirMm:53,flute:73,recorder:74,oboe:68,clarinet:71,bassoon:70,violin:40,viola:41,cello:42};
+function noiseBuf(c){if(c._nb)return c._nb;const b=c.createBuffer(1,c.sampleRate,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return c._nb=b;}
 let master=null,wet=null,dry=null;
 function audioOut(){
   const c=audioCtx();
@@ -349,18 +378,19 @@ function voice(m,t,len,inst,dest,vel){
   const env=c.createGain(),a=Math.min(I.att,len*0.4);
   env.gain.setValueAtTime(0,t);env.gain.linearRampToValueAtTime(I.gain,t+a);
   if(I.pluck){const hold=Math.max(a+0.05,len);   // a piano note is loudest at once and fades while it is held
-    env.gain.exponentialRampToValueAtTime(I.gain*Math.max(0.12,Math.exp(-hold/1.6)),t+hold);env.gain.linearRampToValueAtTime(0.0001,end);
+    env.gain.exponentialRampToValueAtTime(I.gain*Math.max(0.12*Math.min(1,(I.decay||1.6)/1.6),Math.exp(-hold/(I.decay||1.6))),t+hold);env.gain.linearRampToValueAtTime(0.0001,end);
     lp.frequency.setValueAtTime(toneCutoff(f,I),t);lp.frequency.exponentialRampToValueAtTime(Math.max(500,toneCutoff(f,I)*0.45),t+Math.min(hold,1.5));}
   else{env.gain.setValueAtTime(I.gain,t+Math.max(a,len-0.03));env.gain.linearRampToValueAtTime(0.0001,end);}
   const lfo=c.createOscillator(),vd=c.createGain();lfo.frequency.value=I.vib[0];
   vd.gain.setValueAtTime(0,t);vd.gain.linearRampToValueAtTime(I.vib[1],t+Math.min(0.4,len*0.6));lfo.connect(vd);
-  [-5,5].forEach(d=>{const o=c.createOscillator();o.type='sawtooth';o.frequency.value=f;o.detune.value=d;vd.connect(o.detune);o.connect(lp);o.start(t);o.stop(end+0.05);});
+  (I.det||[-5,5]).forEach(d=>{const o=c.createOscillator();o.type=I.wave||'sawtooth';o.frequency.value=f;o.detune.value=d;vd.connect(o.detune);o.connect(lp);o.start(t);o.stop(end+0.05);});
+  if(I.noise){const ns=c.createBufferSource(),bp=c.createBiquadFilter(),ng=c.createGain();ns.buffer=noiseBuf(c);ns.loop=true;bp.type='bandpass';bp.frequency.value=Math.min(7000,f*2.5);bp.Q.value=0.8;ng.gain.value=I.noise*0.5;ns.connect(bp).connect(ng).connect(lp);ns.start(t);ns.stop(end+0.05);}
   lfo.start(t);lfo.stop(end+0.05);
   last.connect(env).connect(dest);
 }
 function play(m,snd){
   if(!st.sound||(rec.on&&rec.mic))return;
-  const out=audioOut();voice(m,ac.currentTime,1.2,snd||part().sound||'viola',out);
+  const out=audioOut();voice(m+(sc.tr||0),ac.currentTime,1.2,snd||part().sound||'viola',out);
 }
 
 /* ---------- necks ----------
@@ -736,7 +766,7 @@ function guessViol(name,clef,sound){
   return sound==='violin'?'treble':sound==='cello'?'bass':'tenor';
 }
 const violOf=p=>p&&VIOLS[p.viol]?p.viol:'tenor';
-const sc={ts:[4,4],bpm:60,sel:-1,cur:0,bi:3,dots:0,parts:[newPart('Part 1','treble','piano',0)],pi:0,reverb:0.3,full:false,neckPart:0};   // neckPart: the part the neck shows while playing (-1: every part)
+const sc={ts:[4,4],bpm:60,sel:-1,cur:0,bi:3,dots:0,parts:[newPart('Part 1','treble','piano',0)],pi:0,reverb:0.3,full:false,neckPart:0,tr:0};   // tr: semitones the sound is above the written notes   // neckPart: the part the neck shows while playing (-1: every part)
 try{sc.full=localStorage.getItem('score-conv-full')==='1';}catch(e){}   // all the parts' staves together (remembered)
 Object.defineProperty(sc,'items',{get(){return sc.parts[sc.pi].items;},set(v){sc.parts[sc.pi].items=v;}});
 Object.defineProperty(sc,'hist',{get(){return sc.parts[sc.pi].hist;},set(v){sc.parts[sc.pi].hist=v;}});
@@ -751,13 +781,13 @@ function buildParts(){
       `<button class="ms mute${p.mute?' on':''}" title="Mute this part">M</button><button class="ms solo${p.solo?' on':''}" title="Play only the solo parts">S</button>`+
       `<label>Volume <input type="range" class="vol" min="0" max="1" step="0.01" value="${p.vol}"></label>`+
       `<label>Pan <input type="range" class="pan" min="-1" max="1" step="0.05" value="${p.pan}" title="Left to right"></label>`+
-      `<label>Sound <select class="snd">${['violin','viola','cello','piano'].map(x=>`<option value="${x}"${x===p.sound?' selected':''}>${x[0].toUpperCase()+x.slice(1)}</option>`).join('')}</select></label>`;
+      `<label>Sound <select class="snd">${SOUNDS.map(g=>`<optgroup label="${g[0]}">${g[1].map(x=>`<option value="${x[0]}"${x[0]===p.sound?' selected':''}>${x[1]}</option>`).join('')}</optgroup>`).join('')}</select></label>`;
     r.querySelector('.pname').onclick=()=>usePart(i);
     r.querySelector('.mute').onclick=()=>{p.mute=!p.mute;mixChanged();buildParts();};
     r.querySelector('.solo').onclick=()=>{p.solo=!p.solo;mixChanged();buildParts();};
     r.querySelector('.vol').oninput=e=>{p.vol=+e.target.value;mixChanged();};
     r.querySelector('.pan').oninput=e=>{p.pan=+e.target.value;mixChanged();};
-    r.querySelector('.snd').onchange=e=>{p.sound=e.target.value;};
+    r.querySelector('.snd').onchange=e=>{p.sound=e.target.value;const f=p.items.find(x=>x.m!=null);play(f?f.m:60,p.sound);};   // (and lets you hear it)
     B.append(r);
   });
   const rv=document.createElement('div');rv.className='prow';
@@ -765,6 +795,9 @@ function buildParts(){
   rv.querySelector('input').oninput=e=>setReverb(+e.target.value);
   B.append(rv);
   buildPartPick();
+  const M=$('midParts');M.innerHTML='';
+  sc.parts.forEach(p=>{const l=document.createElement('label'),c=document.createElement('input');c.type='checkbox';c.checked=p.inMidi!==false;c.onchange=()=>{p.inMidi=c.checked;};l.append(c,' '+p.name);M.append(l);});
+  trShow();
 }
 function buildPartPick(){
   const P=$('partSel');P.innerHTML='';sc.parts.forEach((p,i)=>{const o=document.createElement('option');o.value=i;o.textContent=p.name;P.append(o);});
@@ -803,7 +836,28 @@ function lightNeck(m){
   if(v)placesFor(v,m+neckUp(v)).forEach(p=>st.hl[p.k]='#ff2a2a');
   drawNecks();
 }
+// Dragging a note up or down on the staff moves it line by line, space by space, in the key (a chord moves as a whole).
+let nDrag=null,nDragJust=0;
+function startNoteDrag(ev,pi,idx){
+  if(ev.button||idx<0||playing)return;const it=sc.parts[pi]&&sc.parts[pi].items[idx];if(!it||it.m==null)return;
+  const svg=ev.target.closest('svg');if(!svg)return;const r=svg.getBoundingClientRect(),vb=svg.viewBox&&svg.viewBox.baseVal,k=vb&&vb.width?r.width/vb.width:1;
+  nDrag={pi,idx,y:ev.clientY,step:5*k,base:it.m,ch:it.ch?it.ch.slice():null,moved:0,snapped:false};
+}
+addEventListener('pointermove',ev=>{
+  if(!nDrag)return;const n=Math.round((nDrag.y-ev.clientY)/nDrag.step);if(n===nDrag.moved)return;
+  if(nDrag.pi!==sc.pi)usePart(nDrag.pi);const it=sc.items[nDrag.idx];if(!it){nDrag=null;return;}
+  if(!nDrag.snapped){snap();nDrag.snapped=true;}
+  const k=keyAt(nDrag.idx),d=n>0?1:-1,mv=m=>{let x=m;for(let q=0;q<Math.abs(n);q++){x+=d;while(!spell(x,k).inKey)x+=d;}return Math.max(21,Math.min(108,x));};
+  it.m=mv(nDrag.base);if(nDrag.ch)it.ch=nDrag.ch.map(mv);else delete it.ch;delete it.sp;delete it.tn;nDrag.moved=n;sc.sel=nDrag.idx;sc.cur=nDrag.idx+1;
+  keepScroll(drawRecording);stat('Moving to '+spell(it.m,k).name+'.');
+});
+addEventListener('pointerup',()=>{
+  if(!nDrag)return;const d=nDrag;nDrag=null;if(!d.snapped)return;nDragJust=performance.now();
+  const it=sc.parts[d.pi].items[d.idx];if(it&&it.m!=null){play(it.m);stat('Moved to '+[it.m].concat(it.ch||[]).map(m=>spell(m,keyAt(d.idx)).name).join(' ')+'. Undo puts it back.');}
+});
+addEventListener('pointercancel',()=>{nDrag=null;});
 function selectItem(i){
+  if(performance.now()-nDragJust<400)return;
   if(sc.sel===i){sc.sel=-1;sc.cur=sc.items.length;drawRecording();return;}
   setSel(i);
 }
@@ -1167,7 +1221,7 @@ function drawScore(el){
   allNotes.forEach(a=>{const e=a.sn.getSVGElement&&a.sn.getSVGElement();if(!e||a.p.idx>=nReal)return;
     if(!noteEls.has(a.p.idx))noteEls.set(a.p.idx,[]);noteEls.get(a.p.idx).push(e);
     if(a.p.idx===sc.sel&&!selEl)selEl=e;
-    e.style.cursor='pointer';e.addEventListener('click',()=>selectItem(a.p.idx));});
+    e.style.cursor='pointer';e.style.touchAction='none';e.addEventListener('click',()=>selectItem(a.p.idx));e.addEventListener('pointerdown',ev=>startNoteDrag(ev,sc.pi,a.p.idx));});
   if(playing)markNote(sc.pi,playing.lit[sc.pi],true);
 }
 
@@ -1310,7 +1364,7 @@ function drawFullScore(el){
   all.forEach((list,pi)=>list.forEach(a=>{const e=a.sn.getSVGElement&&a.sn.getSVGElement();if(!e)return;
     const m=noteElsAll[pi];if(!m.has(a.p.idx))m.set(a.p.idx,[]);m.get(a.p.idx).push(e);
     if(pi===sc.pi&&a.p.idx===sc.sel&&!selEl)selEl=e;
-    e.style.cursor='pointer';e.addEventListener('click',()=>{if(pi!==sc.pi)usePart(pi);selectItem(a.p.idx);});}));
+    e.style.cursor='pointer';e.style.touchAction='none';e.addEventListener('click',()=>{if(performance.now()-nDragJust<400)return;if(pi!==sc.pi)usePart(pi);selectItem(a.p.idx);});e.addEventListener('pointerdown',ev=>startNoteDrag(ev,pi,a.p.idx));}));
   if(playing)for(const k in playing.lit)markNote(+k,playing.lit[k],true,noteElsAll[+k]);
 }
 function markActivePart(){document.querySelectorAll('#recscore text.pnm').forEach(t=>{const on=+t.dataset.pi===sc.pi;t.setAttribute('fill',colOfPart(+t.dataset.pi).paper);t.setAttribute('font-weight',on?'bold':'normal');});}
@@ -1481,7 +1535,7 @@ function playScore(){
   const pump=()=>{const p=playing;if(!p)return;const now=ac.currentTime;
     while(p.k<p.ev.length&&p.t0+p.ev[p.k].at*per<now+1.2){
       const e=p.ev[p.k++],at=p.t0+e.at*per;
-      if(e.m!=null&&!e.q)voice(e.m,at,e.d*per*(e.st?0.5:0.97),sc.parts[e.pi].sound,p.buses[e.pi].g,e.v);
+      if(e.m!=null&&!e.q)voice(e.m+(sc.tr||0),at,e.d*per*(e.st?0.5:0.97),sc.parts[e.pi].sound,p.buses[e.pi].g,e.v);
       if(!e.x)p.timers.push(setTimeout(()=>{if(playing!==p)return;p.now[e.pi]=e.m;if(e.m!=null)p.beat[e.pi]++;lightPlaying(e.pi,e.i);paintPlaySoon();},Math.max(0,(at-ac.currentTime)*1000)));
     }};
   pump();playing.loop=setInterval(pump,250);
@@ -1829,6 +1883,7 @@ function addScannedPoly(all,pages,override){
     if(!pl.kb){const lb=live.flatMap(pg=>pg.staves).find(s=>s.part===k&&s.label&&s.label.length>2);if(lb)name=lb.label;}
     return {name,clef:cl==='alto'||cl==='tenor'?null:cl,mainClef:cl,sound,pan:pl.kb||nv<2?0:+(-0.5+k/(nv-1)).toFixed(2),items:res.parts[k].items,v2:res.parts[k].v2,kb:pl.kb&&!twoTreble?pl.kb:null,br:pl.kb&&twoTreble?pl.kb:null};});
   made.forEach(m=>{const same=made.filter(x=>x.name===m.name);if(same.length>1)m.name+=' '+(same.indexOf(m)+1);});
+  made.forEach(m=>{if(!m.kb&&m.items.some(x=>x.ly))m.sound='choirAah';});
   const fresh=sc.parts.every(p=>!p.items.length)||confirm(`Replace the notes you have with the ${made.length} parts read from the score?\n\nOK replaces them. Cancel adds each part to the end of the part in the same place.`);
   if(fresh)sc.parts=made.map(m=>Object.assign(newPart(m.name,m.clef,m.sound,m.pan),{mainClef:m.mainClef,items:m.items,v2:m.v2,pb:true,kb:m.kb}));
   else made.forEach((m,i)=>{const p=sc.parts[i]||(sc.parts[i]=newPart(m.name,m.clef,m.sound,m.pan));p.hist.push(JSON.stringify(p.items));p.items=p.items.concat(m.items);});
@@ -1879,12 +1934,23 @@ $('scAll').onclick=async()=>{
   addScanned(scan.pages.filter(Boolean));
   $('pdfref').classList.remove('open');
 };
+// "5-6", "2, 4-6": the pages to read (counted from 1)
+function pageList(txt,n){const out=[];String(txt).replace(/\s*[-–]\s*/g,'-').split(/[,;\s]+/).forEach(t=>{const m=/^(\d+)(?:-(\d+))?$/.exec(t);if(!m)return;let a=+m[1],b=m[2]?+m[2]:a;if(a>b)[a,b]=[b,a];for(let i=a;i<=b;i++)if(i>=1&&i<=n&&!out.includes(i-1))out.push(i-1);});return out.sort((x,y)=>x-y);}
+$('scSome').onclick=async()=>{
+  const want=pageList($('scPages').value,scan.n);
+  if(!want.length){scanInfo(`Type the pages to read, for example 5-6 or 2,4-6. This score has ${scan.n} page${scan.n===1?'':'s'}.`);return;}
+  for(const i of want){if(!scan.pages[i]){scanInfo(`Reading page ${i+1}…`);await tick();try{await readScanPage(i);}catch(err){console.error(err);}}}
+  const got=want.map(i=>scan.pages[i]).filter(Boolean);if(!got.length){scanInfo('Those pages could not be read.');return;}
+  addScanned(got);$('pdfref').classList.remove('open');
+};
+$('scPages').onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')$('scSome').click();};
 async function loadFile(f){
   const n=f.name.toLowerCase();
   try{
     if(n.endsWith('.json')){
       const d=JSON.parse(await f.text());
-      if(d.app!=='tenor-viol-trainer'&&d.app!=='score-converter')throw new Error('not a Score Converter file');   // (the files still say tenor-viol-trainer inside, as before)
+      if(d.app!=='tenor-viol-trainer'&&d.app!=='score-converter')throw new Error('not a Score Converter file');
+      sc.tr=Math.max(-24,Math.min(24,d.tr|0));   // (the files still say tenor-viol-trainer inside, as before)
       let items;
       const okItem=i=>i&&typeof i.d==='number'&&(i.m==null||typeof i.m==='number');
       if(Array.isArray(d.parts)&&d.parts.length){   // a score with parts
@@ -1930,6 +1996,7 @@ $('upBtn').onclick=()=>setDur((sc.bi-1+BASES.length)%BASES.length);
 $('downBtn').onclick=()=>setDur((sc.bi+1)%BASES.length);
 $('endBtn').onclick=()=>{sc.sel=-1;sc.cur=sc.items.length;drawRecording();stat('Adding notes at the end.');};
 function clearScore(){if(rec.on)stopRec();stopPlay();
+  sc.tr=0;
   if(sc.parts.length>1){sc.parts=[newPart('Part 1','treble','piano',0)];sc.pi=0;sc.neckPart=0;sc.sel=-1;sc.cur=0;buildParts();drawRecording();stat('Cleared all parts.');return;}
   snap();sc.items=[];sc.sel=-1;sc.cur=0;drawRecording();buildParts();stat('Cleared (Undo brings it back).');}
 $('clearBtn').onclick=clearScore;
@@ -1938,6 +2005,28 @@ $('wipeBtn').onclick=()=>{   // always on screen: wipes any exercise, test or pi
   const n=sc.parts.length;
   if(confirm(n>1?`Delete the whole score, all ${n} parts? This cannot be undone.`:'Delete everything in the score? (Undo brings it back.)'))clearScore();};
 $('playBtn').onclick=playScore;
+// Transposing. The score: every note and every key signature moves. The sound: what is played (and written into a MIDI
+// file) is so many semitones above or below the written notes, like a transposing instrument.
+const IVAL=['','a semitone','a tone','a minor third','a major third','a fourth','a tritone','a fifth','a minor sixth','a major sixth','a minor seventh','a major seventh','an octave'];
+for(let n=12;n>=-12;n--){if(!n)continue;const o=document.createElement('option');o.value=n;o.textContent=(n>0?'up ':'down ')+IVAL[Math.abs(n)];if(n===2)o.selected=true;$('trAmt').append(o);}
+function trKey(k,n){const t=pc(k*7+n);let best=0,bd=99;for(let f=-6;f<=6;f++)if(pc(f*7)===t){const d=Math.abs(f)+(k&&Math.sign(f)!==Math.sign(k)?0.5:0);if(d<bd){bd=d;best=f;}}return best;}
+function transposeScore(n){
+  const all=[];sc.parts.forEach(p=>[p.items,p.v2||[]].forEach(its=>its.forEach(it=>{if(it.m!=null)all.push(it.m);if(it.ch)all.push(...it.ch);})));
+  if(all.some(m=>m+n<21||m+n>108)){stat('That would take some notes off the keyboard. Choose a smaller step.');return false;}
+  const mv=m=>m+n;
+  sc.parts.forEach(p=>{[p.items,p.v2||[]].forEach(its=>its.forEach(it=>{if(it.m!=null)it.m=mv(it.m);if(it.ch)it.ch=it.ch.map(mv);if(it.tn)it.tn=it.tn.map(mv);delete it.sp;if(it.sec&&it.sec.k!=null)it.sec.k=trKey(it.sec.k,n);}));p.hist=[];});
+  st.key=trKey(st.key,n);$('key').value=st.key;return true;
+}
+function trShow(){const t=sc.tr||0;$('trNow').textContent=t?`The sound is ${Math.abs(t)} semitone${Math.abs(t)===1?'':'s'} ${t>0?'above':'below'} the written notes.`:'';$('trReset').style.display=t?'':'none';}
+$('trGo').onclick=()=>{
+  const n=+$('trAmt').value,what=$('trWhat').value,was=playing;if(was)stopPlay();
+  if(what==='sound'){const t=(sc.tr||0)+n;if(Math.abs(t)>24){stat('The sound is already two octaves away from the score.');return;}sc.tr=t;}
+  else{if(!sc.parts.some(p=>p.items.length)){stat('Nothing to transpose yet.');return;}if(!transposeScore(n))return;if(what==='score')sc.tr=(sc.tr||0)-n;}
+  sc.sel=-1;drawRecording();buildParts();trShow();
+  const how=(n>0?'up ':'down ')+IVAL[Math.abs(n)];
+  stat(what==='both'?`Score and sound moved ${how}.`:what==='score'?`The score is written ${how}; it sounds as before.`:`The sound moved ${how}; the score is as before.`);
+};
+$('trReset').onclick=()=>{sc.tr=0;trShow();stat('The notes sound as they are written.');};
 $('pUpBtn').onclick=()=>shiftPitch(1,'step');$('pDnBtn').onclick=()=>shiftPitch(-1,'step');
 $('pShBtn').onclick=()=>shiftPitch(1,'semi');$('pFlBtn').onclick=()=>shiftPitch(-1,'semi');
 $('pOuBtn').onclick=()=>shiftPitch(1,'oct');$('pOdBtn').onclick=()=>shiftPitch(-1,'oct');
@@ -2015,7 +2104,7 @@ $('impBtn').onclick=()=>$('impFile').click();
 $('impFile').onchange=()=>{const f=$('impFile').files[0];if(f)loadFile(f);$('impFile').value='';};
 $('pdfClose').onclick=()=>{$('pdfref').classList.remove('open');};
 // the whole score, as saved in a .json file (and kept on this device)
-const scoreData=()=>({app:'score-converter',version:3,title:$('title').value,key:st.key,clef:st.clef,bpm:sc.bpm,ts:sc.ts,reverb:sc.reverb,part:sc.pi,neckPart:sc.neckPart,
+const scoreData=()=>({app:'score-converter',tr:sc.tr||0,version:3,title:$('title').value,key:st.key,clef:st.clef,bpm:sc.bpm,ts:sc.ts,reverb:sc.reverb,part:sc.pi,neckPart:sc.neckPart,
   parts:sc.parts.map(p=>({name:p.name,clef:p.clef,mainClef:p.mainClef||null,kb:p.kb||null,pb:!!p.pb,v2:p.v2||null,sound:p.sound,viol:violOf(p),vol:p.vol,pan:p.pan,mute:p.mute,solo:p.solo,items:p.items}))});
 $('expBtn').onclick=()=>{
   if(rec.on)stopRec();
@@ -2028,16 +2117,16 @@ $('expBtn').onclick=()=>{
 const fileBase=()=>($('title').value||'score').replace(/[^\w\- ]+/g,'')||'score';
 function saveFile(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);}
 // A MIDI file of what Play plays (repeats written out): one track for each part, 480 ticks to a crotchet.
-function midiBytes(){
+function midiBytes(only){
   const tl=buildTimeline(0),K=30,vl=n=>{const b=[n&127];while(n>>=7)b.unshift((n&127)|128);return b;};
   const trk=evs=>{evs.sort((a,b)=>a.t-b.t||a.o-b.o);const d=[];let last=0;evs.forEach(e=>{d.push(...vl(Math.max(0,Math.round(e.t-last))),...e.b);last=Math.round(e.t);});d.push(0,255,47,0);
     return [77,84,114,107,(d.length>>>24)&255,(d.length>>16)&255,(d.length>>8)&255,d.length&255,...d];};
   const us=Math.round(60000000/sc.bpm),head=[{t:0,o:0,b:[255,81,3,(us>>16)&255,(us>>8)&255,us&255]},{t:0,o:0,b:[255,88,4,sc.ts[0],Math.round(Math.log2(sc.ts[1])),24,8]}];
-  const PROG={piano:0,violin:40,viola:41,cello:42},tracks=[trk(head)];
-  sc.parts.forEach((p,pi)=>{const ch=(pi>=9?pi+1:pi)%16,evs=[{t:0,o:0,b:[192|ch,PROG[p.sound]!=null?PROG[p.sound]:41]}];
+  const PROG=GM_PROG,tracks=[trk(head)],tr=sc.tr||0;
+  sc.parts.forEach((p,pi)=>{if(only&&!only.includes(pi))return;const ch=(pi>=9?pi+1:pi)%16,evs=[{t:0,o:0,b:[192|ch,PROG[p.sound]!=null?PROG[p.sound]:41]}];
     const nm=[...new TextEncoder().encode(p.name)].slice(0,100);evs.push({t:0,o:0,b:[255,3,nm.length,...nm]});
     tl.ev.forEach(e=>{if(e.pi!==pi||e.m==null||e.q)return;const v=Math.max(1,Math.min(127,Math.round(84*(e.v||1)*p.vol/0.8))),t0=e.at*K,t1=(e.at+e.d*(e.st?0.5:0.95))*K;
-      evs.push({t:t0,o:2,b:[144|ch,e.m,v]},{t:t1,o:1,b:[128|ch,e.m,0]});});
+      const mm=Math.max(0,Math.min(127,e.m+tr));evs.push({t:t0,o:2,b:[144|ch,mm,v]},{t:t1,o:1,b:[128|ch,mm,0]});});
     tracks.push(trk(evs));});
   return new Uint8Array([77,84,104,100,0,0,0,6,0,1,0,tracks.length,1,224,...tracks.flat()]);
 }
@@ -2089,7 +2178,12 @@ function musicXml(){
   });
   return out+'</score-partwise>\n';
 }
-$('midBtn').onclick=()=>{if(rec.on)stopRec();if(!sc.parts.some(p=>p.items.length)){stat('Nothing to export yet.');return;}saveFile(fileBase()+'.mid',midiBytes(),'audio/midi');stat('Saved a MIDI file of what Play plays.');};
+$('midBtn').onclick=()=>{if(!sc.parts.some(p=>p.items.length)){stat('Nothing to export yet.');return;}
+  const only=sc.parts.map((p,i)=>i).filter(i=>sc.parts[i].inMidi!==false);if(!only.length){stat('Tick at least one part for the MIDI file.');return;}
+  const all=only.length===sc.parts.length;saveFile(fileBase()+(all?'':' ('+only.map(i=>sc.parts[i].name).join(', ').slice(0,60)+')')+'.mid',midiBytes(all?null:only),'audio/midi');
+  stat(all?'Saved a MIDI file of every part.':'Saved a MIDI file of '+only.map(i=>sc.parts[i].name).join(', ')+'.');};
+$('midAll').onclick=()=>{sc.parts.forEach(p=>{p.inMidi=true;});buildParts();};
+$('midPiano').onclick=()=>{const isP=p=>!!p.kb||/piano|keyboard|klavier/i.test(p.name)||/^(piano|epiano|harpsichord)/.test(p.sound);if(!sc.parts.some(isP)){stat('No piano part was found: tick the parts yourself.');return;}sc.parts.forEach(p=>{p.inMidi=isP(p);});buildParts();stat('Only the piano is ticked for the MIDI file.');};
 $('xmlBtn').onclick=()=>{if(rec.on)stopRec();if(!sc.parts.some(p=>p.items.length)){stat('Nothing to export yet.');return;}saveFile(fileBase()+'.musicxml',musicXml(),'application/vnd.recordare.musicxml+xml');stat('Saved a MusicXML file. Open it in MuseScore, Sibelius, Dorico or Finale.');};
 $('pdfBtn').onclick=()=>{if(rec.on)stopRec();stopPlay();drawRecording();stat('In the print dialog, choose "Save as PDF" as the destination.');setTimeout(()=>window.print(),150);};
 addEventListener('keydown',e=>{
