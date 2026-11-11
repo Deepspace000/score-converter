@@ -214,7 +214,7 @@ body.bmpick #recscore,body.bmpick #recscore *{cursor:url("data:image/svg+xml,%3C
 </div>
 
 <script src="vexflow.js"></script>
-<script src="omr.js?v=2.8"></script>
+<script src="omr.js?v=3.0"></script>
 <script>
 const {Renderer,Stave,StaveNote,Voice,Formatter,Accidental,Dot,Beam,StaveTie,Barline,Volta,GhostNote,StaveConnector,Tuplet,Fraction,Articulation,Curve,GraceNote,GraceNoteGroup,Glyph} = Vex.Flow;
 // (parts of the page that are not there answer with a stand-in, so nothing depends on them)
@@ -222,7 +222,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.11';
+const APP_VERSION='5.12';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -1609,7 +1609,7 @@ function loopRange(){
   return t1>t0?{t0,t1,a:A.bar,b:B.bar}:null;
 }
 // the beats of a bar for the count-in (in 6/8, 9/8 and 12/8 the beat is a dotted crotchet)
-function countBeats(){const n=sc.ts[0],d=sc.ts[1];return d===8&&n%3===0&&n>3?{n:n/3,len:24}:{n,len:64/d};}
+function countBeats(){const n=sc.ts[0],d=sc.ts[1];return d>=8&&n%3===0&&n>3?{n:n/3,len:3*64/d}:{n,len:64/d};}
 function clickAt(t,strong,dest){const c=ac,o=c.createOscillator(),g=c.createGain();o.type='square';o.frequency.value=strong?1760:1175;
   g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(strong?0.5:0.3,t+0.002);g.gain.exponentialRampToValueAtTime(0.0001,t+0.07);o.connect(g).connect(dest);o.start(t);o.stop(t+0.09);}
 function playScore(){
@@ -2341,8 +2341,8 @@ async function loadFile(f){
 }
 
 /* ---- wiring ---- */
-for(let i=1;i<=16;i++){const o=document.createElement('option');o.value=i;o.textContent=i;$('tsn').append(o);}
-[1,2,4,8,16].forEach(i=>{const o=document.createElement('option');o.value=i;o.textContent=i;$('tsd').append(o);});
+for(let i=1;i<=32;i++){const o=document.createElement('option');o.value=i;o.textContent=i;$('tsn').append(o);}   // any number of beats ...
+[1,2,4,8,16,32].forEach(i=>{const o=document.createElement('option');o.value=i;o.textContent=i;$('tsd').append(o);});   // ... of any length
 $('tsn').value=4;$('tsd').value=4;
 $('tsn').onchange=$('tsd').onchange=()=>{sc.ts=[+$('tsn').value,+$('tsd').value];sc.parts.forEach(p=>{if(p.items[0]&&p.items[0].sec&&p.items[0].sec.ts)p.items[0].sec.ts=sc.ts;});drawRecording();};
 $('bpm').onchange=()=>{sc.bpm=Math.max(30,Math.min(240,+$('bpm').value||60));$('bpm').value=sc.bpm;drawRecording();};

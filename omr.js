@@ -128,10 +128,12 @@ function analyzeBitmap(imgData, opts){
           if (v && s < 0) s = x;
           else if (!v && s >= 0) {
             const e = x - 1, len = e - s + 1;
-            s0: if (len >= 1.2 * p && len <= 4 * p) {
+            s0: if (len >= 1.2 * p && len <= (opts.thickLedger ? 70 : 4) * p) {
               let head = false;
               for (let xx = s; xx <= e && !head; xx++) { let ya = y, yb = y; while (ya > 0 && bin[(ya-1)*W + xx]) ya--; while (yb < H - 1 && bin[(yb+1)*W + xx]) yb++; if (yb - ya + 1 >= 0.6 * p) head = true; }
               if (!head) break s0;
+              if (len > 4 * p) { let cl = 0, inT = false; for (let xx = s; xx <= e; xx++) { let ya = y, yb = y; while (ya > 0 && bin[(ya-1)*W + xx]) ya--; while (yb < H - 1 && bin[(yb+1)*W + xx]) yb++; const t = yb - ya + 1 >= 0.6 * p; if (t && !inT) cl++; inT = t; }
+                if (cl < 2 || len / cl > 3.4 * p) break s0; }
               any = true;
               // a thick ledger line is straight and the same thickness all along (a tie is a curve, thin at its ends)
               let lim = LT + 1;
@@ -185,7 +187,7 @@ function analyzeBitmap(imgData, opts){
     const near = comps.filter(c => c.minx < st.left + 3.5 * p && c.minx >= st.left + 0.25 * p && c.w >= 0.25 * p);   // (a bracket and its hooks start right at the staff's edge)
     const gClef = near.find(c => c.h >= 5.2 * p && c.w >= 1.0 * p && c.w <= 3.6 * p);
     const cBar = near.find(c => c.h >= 3.6 * p && c.h <= 5.0 * p && c.w <= 0.9 * p);
-    const fClef = near.find(c => c.h >= 2.0 * p && c.h < 3.95 * p && c.w >= 1.0 * p && c.miny - st.top < 0.6 * p && !cBar);
+    const fClef = near.find(c => c.h >= 2.0 * p && c.h < (opts.thickLedger ? 4.3 : 3.95) * p && c.w >= 1.0 * p && c.miny - st.top < 0.6 * p && !cBar);
     let clef = gClef || cBar || fClef || null;
     if (gClef) {
       st.clefType = 'treble';
@@ -197,7 +199,7 @@ function analyzeBitmap(imgData, opts){
     else if (cBar) { const line = Math.round(((cBar.miny + cBar.maxy) / 2 - st.top) / p); st.clefType = ['baritoneC', 'tenor', 'alto', 'mezzo', 'soprano'][line] || null; }
     else if (fClef) st.clefType = 'bass';
     else st.clefType = null;
-    if (!clef) clef = comps.filter(c => c.h > 4 * p && c.h < 8 * p && c.w >= 0.25 * p).sort((a, b) => a.minx - b.minx)[0];
+    if (!clef) clef = comps.filter(c => c.h > 4 * p && c.h < 8 * p && c.w >= 0.25 * p && (!opts.thickLedger || c.minx < st.left + 5 * p)).sort((a, b) => a.minx - b.minx)[0];   // (a group of beamed notes further along is no clef)
     // a C clef is a tall bar plus two curls that come out as separate shapes; they belong to the clef too
     // (otherwise the two curls look like the stacked numbers of a time signature)
     let clefRight = clef ? clef.maxx : 0;
@@ -254,6 +256,22 @@ function analyzeBitmap(imgData, opts){
       const heavyBoth = list => { let up = 0, dn = 0, x0 = 1e9, x1 = -1; const mid = st.top + 2 * p;
         for (const c of list) { x0 = Math.min(x0, c.minx); x1 = Math.max(x1, c.maxx); for (const q of c.pix) { if ((q - (q % W)) / W < mid) up++; else dn++; } }
         const half = (x1 - x0 + 1) * 2 * p; return up >= 0.18 * half && dn >= 0.18 * half; };
+      // Large numbers that reach above and below the staff (some programs print the time signature so): the number over
+      // the middle line and the number under it are each read by themselves.
+      if (!tsx && opts.thickLedger) {
+        const big = comps.filter(c => c.minx >= afterKey - 0.3 * p && c.minx < afterKey + 4.5 * p && c.h >= 2.5 * p && c.h <= 4.4 * p && c.w >= 1.0 * p && c.w <= 3.4 * p);
+        const midY = st.top + 2 * p, up = big.filter(c => (c.miny + c.maxy) / 2 < midY), dn = big.filter(c => (c.miny + c.maxy) / 2 >= midY);
+        if (up.length && dn.length && up.length <= 2 && dn.length <= 2) {
+          const box = l => ({ x0: Math.min(...l.map(c => c.minx)), x1: Math.max(...l.map(c => c.maxx)), y0: Math.min(...l.map(c => c.miny)), y1: Math.max(...l.map(c => c.maxy)) });
+          const A0 = box(up), B0 = box(dn), gapY = B0.y0 - A0.y1;
+          // (the first notes of two voices, one stem up and one stem down, look much the same: but most of a note's
+          //  height is its thin stem, and a number has no thin part)
+          const thinRows = l => { const rows = new Map(); for (const c of l) for (const q of c.pix) { const y = (q - (q % W)) / W; rows.set(y, (rows.get(y) || 0) + 1); } let n = 0, t = 0; for (const v of rows.values()) { n++; if (v <= 0.22 * p) t++; } return n ? t / n : 1; };
+          if (thinRows(up) < 0.3 && thinRows(dn) < 0.3 && A0.y0 <= st.top + 0.4 * p && B0.y1 >= st.bot - 0.4 * p && gapY < 1.3 * p && gapY > -0.4 * p && Math.min(A0.x1, B0.x1) - Math.max(A0.x0, B0.x0) > 0.5 * Math.min(A0.x1 - A0.x0, B0.x1 - B0.x0)) {
+            tsx = [Math.min(A0.x0, B0.x0), Math.max(A0.x1, B0.x1)]; ms = Math.max(ms, tsx[1]); st.tsBig = { a: A0, b: B0 };
+          }
+        }
+      }
       // Narrow numbers that touch or break into pieces: the first ink after the key signature, close to it, as tall as
       // the staff and nothing sticking out over or under it, that reads as two numbers.
       if (!tsx && opts.thickLedger) {
@@ -270,8 +288,8 @@ function analyzeBitmap(imgData, opts){
           }
           const area = (b - a + 1) * 2 * p;
           if (!out && up >= 0.2 * area && dn >= 0.2 * area && Math.abs(ty - st.top) <= 0.45 * p && Math.abs(by - st.bot) <= 0.45 * p) {
-            const A = omrReadNumber(clean, W, H, a - 1, b + 1, y0, Math.round(st.top + 2.0 * p), [2, 3, 4, 5, 6, 7, 9, 12]);
-            const B = omrReadNumber(clean, W, H, a - 1, b + 1, Math.round(st.top + 2.0 * p) + 1, y1, [2, 4, 8, 16]);
+            const A = omrReadNumber(clean, W, H, a - 1, b + 1, y0, Math.round(st.top + 2.0 * p), OMR_TS_TOP.filter(n => n !== 8 && n !== 1));
+            const B = omrReadNumber(clean, W, H, a - 1, b + 1, Math.round(st.top + 2.0 * p) + 1, y1, OMR_TS_BOT);
             if (A && B) { tsx = [a, b]; ms = Math.max(ms, b); st.tsRead = [A, B]; }
           }
         }
@@ -436,6 +454,22 @@ function analyzeBitmap(imgData, opts){
     }
   }
 
+  // 6c. A small hollow note with a staff line through it: its hollow is filled in two halves, and pin-holes can stay
+  //     between them and the ring. A white dot with ink within three dots of it on all four sides is filled as well
+  //     (it counts as part of the hollow), or the note falls apart into pieces too small to be a note.
+  if (opts.thickLedger) for (let pass = 0; pass < 2; pass++) for (const [ya, yb] of ranges) {
+    for (let y = Math.max(ya, 3); y <= Math.min(yb, H - 4); y++) { const o = y * W; for (let x = 3; x < W - 3; x++) {
+      const k = o + x; if (filled[k]) continue;
+      if (!(filled[k - 1] || filled[k - 2] || filled[k - 3])) continue;
+      if (!(filled[k + 1] || filled[k + 2] || filled[k + 3])) continue;
+      if (!(filled[k - W] || filled[k - 2 * W] || filled[k - 3 * W])) continue;
+      if (!(filled[k + W] || filled[k + 2 * W] || filled[k + 3 * W])) continue;
+      // (only beside a hollow that was found: not the gaps of letters or between beams)
+      let near = false; for (let dy = -4; dy <= 4 && !near; dy++) { const yy = y + dy; if (yy < 0 || yy >= H) continue; for (let dx = -4; dx <= 4; dx++) if (holes[yy * W + x + dx]) { near = true; break; } }
+      if (near) { filled[k] = 1; holes[k] = 1; }
+    } }
+  }
+
   // 7. run lengths -> "core" pixels that are thick both ways (only noteheads are)
   const hRun = new Uint16Array(N), vRun = new Uint16Array(N);
   for (const [ya, yb] of ranges) {
@@ -480,7 +514,11 @@ function analyzeBitmap(imgData, opts){
       let l = cxi, gap = 0; while (l > 0) { if (bin[o + l - 1]) { gap = 0; l--; } else if (++gap <= 1) l--; else break; }
       let r = cxi; gap = 0; while (r < W - 1) { if (bin[o + r + 1]) { gap = 0; r++; } else if (++gap <= 1) r++; else break; }
       const len = r - l;
-      if (!(len >= 1.5 * p && len <= 8 * p && l <= cx - 0.5 * p && r >= cx + 0.5 * p)) continue;
+      if (!(len >= 1.5 * p && len <= (opts.thickLedger ? 70 : 8) * p && l <= cx - 0.5 * p && r >= cx + 0.5 * p)) continue;
+      if (len > 8 * p) {   // (several notes' ledger lines in one: a note on it every few spaces)
+        let cl = 0, inT = false; for (let xx = l; xx <= r; xx++) { let ya = y, yb = y; while (ya > 0 && bin[(ya - 1) * W + xx]) ya--; while (yb < H - 1 && bin[(yb + 1) * W + xx]) yb++; const t = yb - ya + 1 >= 0.6 * p; if (t && !inT) cl++; inT = t; }
+        if (cl < 3 || len / cl > 3.4 * p) continue;
+      }
       // the ends of a ledger line are thin: nothing directly above or below them (letters have serifs and legs there)
       const e = Math.max(2, Math.round(0.25 * p)), d = LT + 1;
       const endsThin = (yy) => blackRatio(yy, l, l + e) < 0.35 && blackRatio(yy, r - e, r) < 0.35;
@@ -551,6 +589,24 @@ function analyzeBitmap(imgData, opts){
   const notes = [];
   const rej = [];
   const R = (b, why, extra) => { if (opts.debug) rej.push({ why, x: Math.round(b.cx), y: Math.round(b.cy), w: b.maxx - b.minx + 1, h: b.maxy - b.miny + 1, area: b.area, ...extra }); };
+  // Some music fonts (the ones that look written by hand) have small, slanting note heads, narrower than usual. A page
+  // is taken to be in such a font when its head-sized shapes are mostly narrow.
+  let smallHeads = false;
+  if (opts.thickLedger) {
+    const ws = blobs.map(q => [q.maxx - q.minx + 1, q.maxy - q.miny + 1]).filter(q => q[1] >= 0.75 * U && q[1] <= 1.15 * U && q[0] >= 0.7 * U && q[0] <= 1.5 * U).map(q => q[0]).sort((a, c) => a - c);
+    if (ws.length >= 12 && ws[ws.length >> 1] < 1.08 * U) smallHeads = true;
+  }
+  // (a small head with its stem over it and a tie under it: solid in the middle, and only ONE long upright stroke
+  //  runs through it. A sharp or a natural has two.)
+  const smallTied = (b, p) => {
+    if (!smallHeads) return false;
+    const rx = 0.40 * p, ry = 0.34 * p; let n = 0, c = 0;
+    for (let y = Math.round(b.cy - ry); y <= Math.round(b.cy + ry); y++) { const dy = (y - b.cy) / ry, half = rx * Math.sqrt(Math.max(0, 1 - dy * dy)); for (let x = Math.round(b.cx - half); x <= Math.round(b.cx + half); x++) { if (x < 0 || y < 0 || x >= W || y >= H) continue; n++; c += filled[y * W + x]; } }
+    if (!n || c / n < 0.9) return false;
+    const y0 = Math.round(b.cy), xa = Math.max(0, Math.round(b.minx - 0.3 * p)), xb = Math.min(W - 1, Math.round(b.maxx + 0.3 * p)), xm = (xa + xb) / 2; let L = 0, Rr = 0;
+    for (let x = xa; x <= xb; x++) { if (!filled[y0 * W + x]) continue; let a2 = y0, b2 = y0; while (a2 > 0 && filled[(a2 - 1) * W + x]) a2--; while (b2 < H - 1 && filled[(b2 + 1) * W + x]) b2++; const r = b2 - a2 + 1; if (x < xm) { if (r > L) L = r; } else if (r > Rr) Rr = r; }
+    return !(L >= 1.8 * p && Rr >= 1.8 * p);
+  };
   for (const b0 of blobs) {
     let b = b0, w = b.maxx - b.minx + 1, h = b.maxy - b.miny + 1;
     // which staff?
@@ -603,7 +659,7 @@ function analyzeBitmap(imgData, opts){
     // sharps and naturals: vertical strokes continue both above and below the filled centre
     // (on a piano page a full-sized solid head stays even with marks above and below it: its stem on one side, a slur,
     //  an accent or a fingering number on the other. The filled middle of a sharp or natural is much narrower.)
-    if (strokeCov(b, -1, p) >= 0.12 && strokeCov(b, 1, p) >= 0.12 && !stemThrough(b, p) && !(opts.thickLedger && w >= 1.0 * p && w <= 1.5 * p && h >= 0.75 * p && h <= 1.25 * p && ellipseFill(b.cx, b.cy, p) >= 0.9)) { R(b, 'strokes'); continue; }
+    if (strokeCov(b, -1, p) >= 0.12 && strokeCov(b, 1, p) >= 0.12 && !stemThrough(b, p) && !(opts.thickLedger && w >= 1.0 * p && w <= 1.5 * p && h >= 0.75 * p && h <= 1.25 * p && (ellipseFill(b.cx, b.cy, p) >= 0.9 || smallTied(b, p)))) { R(b, 'strokes'); continue; }
     let heads = [];
     if (h >= 0.5 * p && h <= 1.5 * p) { if (b.area < 0.28 * p * p) { R(b, 'area'); continue; } heads.push({ x: b.cx, y: b.cy, tol: 0.3 }); }
     else if (h > 1.5 * p && h <= 3.5 * p && w <= 1.7 * p) { const n = Math.max(2, Math.round(h / p)); for (let k = 0; k < n; k++) heads.push({ x: b.cx, y: b.miny + (k + 0.5) * h / n, tol: 0.4 }); }
@@ -633,7 +689,18 @@ function analyzeBitmap(imgData, opts){
         let hollowIn = 0; if (opts.thickLedger && corners >= 3) for (let yy = b.miny; yy <= b.maxy; yy++) for (let xx = b.minx; xx <= b.maxx; xx++) if (holes[yy * W + xx]) hollowIn++;
         if (corners >= 3 && b.maxy - b.miny + 1 <= 0.8 * p && hollowIn < 0.04 * w * h) { R(b, 'block'); continue; } }
       const ef = ellipseFill(hd.x, hd.y, p);
-      if (ef < 0.82) { R(b, 'fill', { ef: +ef.toFixed(2), step }); continue; }      // not a solid oval: rest, accidental, text
+      if (ef < 0.82) {      // not a solid oval: rest, accidental, text
+        let small = false;
+        if (smallHeads && w >= 0.7 * p && w <= 1.3 * p && h <= 1.25 * p) {
+          // (a small head: a smaller oval is solid inside it)
+          const rx = 0.40 * p, ry = 0.34 * p; let n = 0, c = 0;
+          for (let y = Math.round(hd.y - ry); y <= Math.round(hd.y + ry); y++) { const dy = (y - hd.y) / ry, half = rx * Math.sqrt(Math.max(0, 1 - dy * dy)); for (let x = Math.round(hd.x - half); x <= Math.round(hd.x + half); x++) { if (x < 0 || y < 0 || x >= W || y >= H) continue; n++; c += filled[y * W + x]; } }
+          // (the round part of a flat or natural has its upright stroke rising from its left edge: a note's stem never does)
+          let up = 0; for (let x = Math.max(0, b.minx - 2); x <= b.minx + Math.round(0.25 * p); x++) { let r = 0; for (let y = b.miny - 1; y >= 0 && y > b.miny - 2 * p; y--) { if (filled[y * W + x]) r++; else break; } if (r > up) up = r; }
+          if (n && c / n >= 0.9 && up < 1.1 * p) small = true;
+        }
+        if (!small) { R(b, 'fill', { ef: +ef.toFixed(2), step }); continue; }
+      }
       if (opts.ledger && (step <= -2 || step >= 10)) {
         const ls = step >= 10 ? (step % 2 === 0 ? step : step - 1) : (step % 2 === 0 ? step : step + 1);
         if (!ledgerOk(hd.x, st.top + ls * p / 2, p)) { R(b, 'ledger', { step }); continue; }
@@ -1237,10 +1304,14 @@ function omrReadPage(imgData, again) {
     const totals = {}; elems.forEach(e => { totals[e.bar] = (totals[e.bar] || 0) + e.d; });
     elems.forEach(e => { if (e.multi) totals[e.bar] = null; });     // a several-bar rest fills its bar whatever the time
     let ts = st.tsRead || null;
-    if (!ts && st.tsBox) {
-      const a = omrReadNumber(clean, W, H, st.tsBox[0] - 2, st.tsBox[1] + 2, Math.round(st.top - 0.2 * p), Math.round(st.top + 1.85 * p), [1, 2, 3, 4, 5, 6, 7, 8, 9, 12]);
-      const b = omrReadNumber(clean, W, H, st.tsBox[0] - 2, st.tsBox[1] + 2, Math.round(st.top + 2.15 * p), Math.round(st.bot + 0.2 * p), [1, 2, 4, 8, 16]);
-      if (a && a <= 16 && [1, 2, 4, 8, 16].includes(b)) ts = [a, b];
+    if (!ts && st.tsBig) {   // large numbers, each in its own place
+      const g = st.tsBig, A = omrReadNumber(clean, W, H, g.a.x0 - 1, g.a.x1 + 1, g.a.y0 - 1, g.a.y1 + 1, OMR_TS_TOP, 0.15), B = omrReadNumber(clean, W, H, g.b.x0 - 1, g.b.x1 + 1, g.b.y0 - 1, g.b.y1 + 1, OMR_TS_BOT, 0.15);
+      if (A && B) ts = [A, B];
+    }
+    if (!ts && st.tsBox && !st.tsBig) {
+      const a = omrReadNumber(clean, W, H, st.tsBox[0] - 2, st.tsBox[1] + 2, Math.round(st.top - 0.2 * p), Math.round(st.top + 1.85 * p), again ? OMR_TS_TOP : [1, 2, 3, 4, 5, 6, 7, 8, 9, 12]);
+      const b = omrReadNumber(clean, W, H, st.tsBox[0] - 2, st.tsBox[1] + 2, Math.round(st.top + 2.15 * p), Math.round(st.bot + 0.2 * p), again ? [1, 2, 4, 8, 16, 32] : [1, 2, 4, 8, 16]);
+      if (a && a <= 16 && [1, 2, 4, 8, 16, 32].includes(b)) ts = [a, b];
     }
     let tsC = null;
     if (!ts && st.tsSym) { ts = st.tsSym; tsC = st.tsSym[0] === 2 ? 'C|' : 'C'; }   // C or cut C (shown as printed)
@@ -1431,7 +1502,8 @@ function omrReadPage(imgData, again) {
 
 // Reads a printed number (such as the count over a several-bar rest) by comparing it with numbers drawn in a serif font.
 let omrNumTemplates = null;
-function omrReadNumber(bin, W, H, x0, x1, y0, y1, allowed) {
+const OMR_TS_TOP = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], OMR_TS_BOT = [2, 4, 8, 16, 32];
+function omrReadNumber(bin, W, H, x0, x1, y0, y1, allowed, minS) {
   x0 = Math.max(0, x0); x1 = Math.min(W - 1, x1); y0 = Math.max(0, y0); y1 = Math.min(H - 1, y1);
   let minx = 1e9, maxx = -1, miny = 1e9, maxy = -1;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (bin[y * W + x]) { if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y; }
@@ -1487,7 +1559,7 @@ function omrReadNumber(bin, W, H, x0, x1, y0, y1, allowed) {
     let first = S; for (let j = Math.round(0.36 * S); j <= Math.round(0.56 * S); j++) { let i = 0; while (i < S && !a[j * S + i]) i++; if (i < first) first = i; }
     if (first >= 0.38 * S) best = 3;
   }
-  return bestS > 0.35 ? best : null;
+  return bestS > (minS == null ? 0.35 : minS) ? best : null;
 }
 
 // The dynamics p, pp, mp, mf, f, ff ... drawn in the music font of the notation library, for comparing with what is on
