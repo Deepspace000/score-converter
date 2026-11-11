@@ -39,6 +39,12 @@ input[type=range],input[type=checkbox]{accent-color:var(--acc)}
   #scoreBox{margin:0 6px 6px}
   .foldp{padding:8px}
   #pdfref{inset:4px;padding:8px}
+  #scStep{font-size:13px}
+  #scLegend{display:none}
+}
+@media (max-width:480px){
+  #topbar .appname{display:none}
+  #partSel{max-width:130px}
 }
 .foldp{flex:none;display:none;background:var(--panel);border-bottom:1px solid var(--line);padding:10px 14px;max-height:46vh;overflow:auto}
 .foldp.open{display:block}
@@ -234,7 +240,7 @@ body.bmpick #recscore,body.bmpick #recscore *{cursor:url("data:image/svg+xml,%3C
   <div id="scStep" class="hint" style="margin-top:0"></div>
   <div id="scBar"><div></div></div>
   <div class="score" id="scInfo"></div>
-  <div class="controls" style="font-size:12px"><span class="score" style="font-size:12px">Marks on the page show what was read: B breve, S semibreve, M minim, C crotchet, Q quaver, q semiquaver, a dot means dotted, r is a rest, green lines are bar lines.</span>
+  <div class="controls" style="font-size:12px"><span class="score" id="scLegend" style="font-size:12px">Marks on the page show what was read: B breve, S semibreve, M minim, C crotchet, Q quaver, q semiquaver, a dot means dotted, r is a rest, green lines are bar lines.</span>
     <label title="Tick this if the key signature was read wrongly: choose the right key under Edit first" style="font-size:12px"><input type="checkbox" id="scKey"> Use the key chosen under Edit</label></div>
   <div id="scView"><canvas id="scCanvas" style="width:100%;display:block"></canvas></div>
 </div>
@@ -248,7 +254,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.19';
+const APP_VERSION='5.20';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -375,7 +381,7 @@ function audioCtx(){
     try{if(ac.state!=='closed')ac.close();}catch(e){}
     ac=null;master=wet=dry=null;wakeAsked=0;   // (the next sound builds its room and limiter again)
   }
-  if(!ac){ac=new (window.AudioContext||window.webkitAudioContext)();audioWoken=false;}
+  if(!ac){const AC=window.AudioContext||window.webkitAudioContext;if(!AC){stat('This browser cannot play sound.');throw new Error('no sound in this browser');}ac=new AC();audioWoken=false;}
   if(ac.state!=='running'){if(!wakeAsked)wakeAsked=performance.now();const c=ac;c.resume().then(()=>{if(c===ac)wakeAsked=0;}).catch(()=>{});}
   else wakeAsked=0;
   return ac;
@@ -2829,7 +2835,10 @@ $('midBtn').onclick=()=>{if(!sc.parts.some(p=>p.items.length)){stat('Nothing to 
 $('midAll').onclick=()=>{sc.parts.forEach(p=>{p.inMidi=true;});buildParts();};
 $('midPiano').onclick=()=>{const isP=p=>!!p.kb||/piano|keyboard|klavier/i.test(p.name)||/^(piano|epiano|harpsichord)/.test(p.sound);if(!sc.parts.some(isP)){stat('No piano part was found: tick the parts yourself.');return;}sc.parts.forEach(p=>{p.inMidi=isP(p);});buildParts();stat('Only the piano is ticked for the MIDI file.');};
 $('xmlBtn').onclick=()=>{if(rec.on)stopRec();if(!sc.parts.some(p=>p.items.length)){stat('Nothing to export yet.');return;}saveFile(fileBase()+'.musicxml',musicXml(),'application/vnd.recordare.musicxml+xml','Saved a MusicXML file, for MuseScore, Sibelius, Dorico or Finale.');};
-$('pdfBtn').onclick=()=>{if(rec.on)stopRec();stopPlay();drawRecording();stat('In the print dialog, choose "Save as PDF" as the destination.');setTimeout(()=>window.print(),150);};
+const SAFARI=IOS||/^((?!chrome|chromium|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
+if(!window.showSaveFilePicker)$('expBtn').title='Everything, to open again here later. The file goes to the downloads folder.';
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}
+$('pdfBtn').onclick=()=>{if(rec.on)stopRec();stopPlay();drawRecording();stat(IOS?'In the print window, press the share button at the top to save the pages as a PDF.':SAFARI?'In the print dialog, open the PDF menu at the bottom and choose Save as PDF.':'In the print dialog, choose "Save as PDF" as the destination.');setTimeout(()=>window.print(),150);};
 addEventListener('keydown',e=>{
   if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
   if(roteMoving()&&['ArrowUp','ArrowDown','Enter'].includes(e.key)){e.preventDefault();if(e.key==='Enter')roteStaffCheck();else roteMove(e.key==='ArrowUp'?1:-1);return;}   // (putting a note on the staff)
