@@ -235,7 +235,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.17';
+const APP_VERSION='5.18';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -277,13 +277,13 @@ const SHARP=['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
 const FLAT =['C','D♭','D','E♭','E','F','G♭','G','A♭','A','B♭','B'];
 const NAT=[0,2,4,5,7,9,11];
 const st={mode:'explore',clef:'treble',acc:'all',key:0,frets:7,labels:true,sound:true,
-  show:[],target:null,answered:false,right:0,total:0,streak:0,pending:null,hl:{},necks:['tenor'],sv:'tenor',neckFrac:null,zoom:1,follow:true,pulse:{},place:'all',roteSize:1.3,tune:'G'};
+  show:[],target:null,answered:false,right:0,total:0,streak:0,pending:null,hl:{},necks:['tenor'],sv:'tenor',neckFrac:null,zoom:1.3,follow:true,pulse:{},place:'all',roteSize:1.3,tune:'G'};
 // remembered on this device: the necks shown, the room they take (the bar above the score), the size of the music
 // and Follow score.
 // st.sv is the viol whose notes the staff under Settings shows.
 try{const n=JSON.parse(localStorage.getItem('score-conv-necks')||'null');if(Array.isArray(n)&&n.some(v=>VIOLS[v]))st.necks=VIOL_ORDER.filter(v=>n.includes(v));
   const f=+localStorage.getItem('score-conv-neckh');if(f>0.03&&f<0.9)st.neckFrac=f;
-  const z=+localStorage.getItem('score-conv-zoom');if(z>=0.6&&z<=1.6)st.zoom=z;
+  const z=+localStorage.getItem('score-conv-zoom2');if(z>=0.6&&z<=1.6)st.zoom=z;   // (zoom2: the music starts out larger since 5.18)
   st.follow=localStorage.getItem('score-conv-follow')!=='0';
   const pl=localStorage.getItem('score-conv-place');if(pl==='low'||pl==='high')st.place=pl;
   const rs=+localStorage.getItem('score-conv-rotesize');if(rs>=0.8&&rs<=3)st.roteSize=rs;
@@ -410,13 +410,32 @@ const INST={
   recorder:{lp:[5,6000],body:[[2000,1.5,3]],vib:[5,3],att:0.04,gain:0.15,wave:'triangle',det:[-2,2],noise:0.25},
   oboe:{lp:[9,6500],body:[[1100,4,12],[2900,5,9]],vib:[5.5,7],att:0.04,gain:0.22,det:[0]},
   clarinet:{lp:[6,4500],body:[[1500,2,4]],vib:[5,3],att:0.05,gain:0.155,wave:'square',det:[0]},
-  bassoon:{lp:[7,2800],body:[[480,3,10],[1200,3,4]],vib:[5,4],att:0.05,gain:0.115,det:[-2,2]}
+  bassoon:{lp:[7,2800],body:[[480,3,10],[1200,3,4]],vib:[5,4],att:0.05,gain:0.115,det:[-2,2]},
+  // plucked strings
+  harp:{lp:[6,4500],body:[[400,1,3]],vib:[5,0],att:0.003,gain:0.135,pluck:true,decay:1.4,wave:'triangle',det:[-2,2]},
+  harpBright:{lp:[10,7000],body:[[700,1.2,3],[2500,1.5,3]],vib:[5,0],att:0.002,gain:0.17,pluck:true,decay:1.0,det:[-3,3]},
+  harpSoft:{lp:[3.5,2200],body:[[300,1,3]],vib:[5,0],att:0.006,gain:0.13,pluck:true,decay:2.0,wave:'triangle',det:[-2,2]},
+  guitar:{lp:[5,3200],body:[[110,1.5,5],[220,1.5,4],[900,2,-2]],vib:[5,0],att:0.004,gain:0.18,pluck:true,decay:0.9,det:[-2,2]},
+  // old keyboards
+  clavichord:{lp:[9,5000],body:[[600,1.5,4],[1800,2,3]],vib:[6,4],att:0.002,gain:0.25,pluck:true,decay:0.35,det:[-4,4]},
+  fortepiano:{lp:[9,6000],body:[[350,1,2],[1500,1.5,3]],vib:[5,0],att:0.004,gain:0.2,pluck:true,decay:0.8,det:[-6,5]},
+  // old computers and game consoles (pw: a pulse wave, on for that part of each cycle)
+  c64Pulse:{lp:[30,12000],body:[],vib:[6,8],att:0.002,gain:0.14,pw:0.25,det:[0]},
+  c64Saw:{lp:[5,2800],body:[[1400,5,9]],vib:[6,5],att:0.002,gain:0.13,det:[0]},
+  c64Tri:{lp:[30,12000],body:[],vib:[6,0],att:0.002,gain:0.16,wave:'triangle',det:[0]},
+  chipSquare:{lp:[40,14000],body:[],vib:[5,0],att:0.001,gain:0.085,wave:'square',det:[0]},
+  chipPulse:{lp:[40,14000],body:[],vib:[7,6],att:0.001,gain:0.2,pw:0.125,det:[0]},
+  chipPluck:{lp:[40,14000],body:[],vib:[5,0],att:0.001,gain:0.2,wave:'square',det:[0],pluck:true,decay:0.3}
 };
-const SOUNDS=[['Keyboards',[['piano','Grand piano'],['pianoBright','Bright piano'],['pianoSoft','Soft piano'],['pianoUpright','Upright piano'],['epiano','Electric piano'],['harpsichord','Harpsichord']]],
+// a pulse wave that is on for the part d of each cycle (the thin, nasal sound of old sound chips)
+function pulseWave(c,d){c._pw=c._pw||{};if(c._pw[d])return c._pw[d];const n=64,re=new Float32Array(n),im=new Float32Array(n);for(let k=1;k<n;k++)re[k]=2/(k*Math.PI)*Math.sin(k*Math.PI*d);return c._pw[d]=c.createPeriodicWave(re,im);}
+const SOUNDS=[['Keyboards',[['piano','Grand piano'],['pianoBright','Bright piano'],['pianoSoft','Soft piano'],['pianoUpright','Upright piano'],['epiano','Electric piano'],['harpsichord','Harpsichord'],['clavichord','Clavier (clavichord)'],['fortepiano','Clavier (fortepiano)']]],
+  ['Harp and guitar',[['harp','Concert harp'],['harpBright','Bright harp'],['harpSoft','Soft harp'],['guitar','Classical guitar']]],
+  ['C64 and chiptune',[['c64Pulse','C64 pulse'],['c64Saw','C64 sawtooth'],['c64Tri','C64 triangle'],['chipSquare','Chiptune square'],['chipPulse','Chiptune thin pulse'],['chipPluck','Chiptune pluck']]],
   ['Voices',[['choirAah','Choir, aah'],['choirOoh','Choir, ooh'],['choirMm','Choir, humming']]],
   ['Woodwind',[['flute','Flute'],['recorder','Recorder'],['oboe','Oboe'],['clarinet','Clarinet'],['bassoon','Bassoon']]],
   ['Strings',[['violin','Violin'],['viola','Viola'],['cello','Cello']]]];
-const GM_PROG={piano:0,pianoBright:1,pianoSoft:0,pianoUpright:3,epiano:4,harpsichord:6,choirAah:52,choirOoh:53,choirMm:53,flute:73,recorder:74,oboe:68,clarinet:71,bassoon:70,violin:40,viola:41,cello:42};
+const GM_PROG={piano:0,pianoBright:1,pianoSoft:0,pianoUpright:3,epiano:4,harpsichord:6,choirAah:52,choirOoh:53,choirMm:53,flute:73,recorder:74,oboe:68,clarinet:71,bassoon:70,violin:40,viola:41,cello:42,harp:46,harpBright:46,harpSoft:46,guitar:24,clavichord:7,fortepiano:2,c64Pulse:80,c64Saw:81,c64Tri:79,chipSquare:80,chipPulse:80,chipPluck:80};
 function noiseBuf(c){if(c._nb)return c._nb;const b=c.createBuffer(1,c.sampleRate,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return c._nb=b;}
 let master=null,wet=null,dry=null;
 function audioOut(){
@@ -451,7 +470,7 @@ function voice(m,t,len,inst,dest,vel){
   else{env.gain.setValueAtTime(I.gain,t+Math.max(a,len-0.03));env.gain.linearRampToValueAtTime(0.0001,end);}
   const lfo=c.createOscillator(),vd=c.createGain();lfo.frequency.value=I.vib[0];
   vd.gain.setValueAtTime(0,t);vd.gain.linearRampToValueAtTime(I.vib[1],t+Math.min(0.4,len*0.6));lfo.connect(vd);
-  (I.det||[-5,5]).forEach(d=>{const o=c.createOscillator();o.type=I.wave||'sawtooth';o.frequency.value=f;o.detune.value=d;vd.connect(o.detune);o.connect(lp);o.start(t);o.stop(end+0.05);});
+  (I.det||[-5,5]).forEach(d=>{const o=c.createOscillator();if(I.pw)o.setPeriodicWave(pulseWave(c,I.pw));else o.type=I.wave||'sawtooth';o.frequency.value=f;o.detune.value=d;vd.connect(o.detune);o.connect(lp);o.start(t);o.stop(end+0.05);});
   if(I.noise){const ns=c.createBufferSource(),bp=c.createBiquadFilter(),ng=c.createGain();ns.buffer=noiseBuf(c);ns.loop=true;bp.type='bandpass';bp.frequency.value=Math.min(7000,f*2.5);bp.Q.value=0.8;ng.gain.value=I.noise*0.5;ns.connect(bp).connect(ng).connect(lp);ns.start(t);ns.stop(end+0.05);}
   lfo.start(t);lfo.stop(end+0.05);
   last.connect(env).connect(dest);
@@ -2665,7 +2684,7 @@ $('placeSel').onchange=()=>{st.place=$('placeSel').value;keep('score-conv-place'
 try{$('origChk').checked=localStorage.getItem('score-conv-lines')!=='0';}catch(e){}
 $('origChk').onchange=()=>{keep('score-conv-lines',$('origChk').checked?null:'0');keepScroll(drawRecording);};
 let zoomT=0;
-$('zoom').oninput=()=>{st.zoom=+$('zoom').value;clearTimeout(zoomT);zoomT=setTimeout(()=>{keepScroll(drawRecording);keep('score-conv-zoom',String(st.zoom));},120);};
+$('zoom').oninput=()=>{st.zoom=+$('zoom').value;clearTimeout(zoomT);zoomT=setTimeout(()=>{keepScroll(drawRecording);keep('score-conv-zoom2',String(st.zoom));},120);};
 $('fromSel').onchange=()=>{const map=barMap(),v=$('fromSel').value,b=v==='start'?null:map[+v];$('fromBar').value=b?b.bar:'';
   if(sc.sel>=0){const old=sc.sel;sc.sel=-1;paintNote(old,null);}   // a chosen section wins over a selected note
   if(b){const bars=splitBars(sc.items,part().pb),first=bars[map.indexOf(b)],idx=first&&first[0]&&first[0].idx,e=idx!=null&&(noteEls.get(idx)||[])[0];if(e)e.closest('svg').scrollIntoView({block:'nearest'});}};

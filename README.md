@@ -16,7 +16,7 @@ Open it here: https://deepspace000.github.io/score-converter/
 - **Careful scan (slower)**: tick this on the scan page for a slower, more accurate reading. Every bar that does not add up is read again in nine different ways, and the reading most of them agree on is kept. It adds a few seconds for each doubtful bar. **Undo re-scan** puts the first reading back.
 - **Re-scan bars**: if some bars came out wrong, type their numbers under **Edit** (or click a note in the bar) and press **Re-scan from the page**. The bar is cut out of the printed page and read again. Each further press reads it a different way (on its own, larger, smaller, with the bars either side, each staff by itself, with the print made heavier or lighter) and shows the next reading you have not seen yet. **Undo re-scan** goes back one press at a time.
 - **Transpose**: the score and the sound together, the score only, or the sound only.
-- **Choose the sounds**: pianos, harpsichord, choir, flute, recorder, oboe, clarinet, bassoon and strings, for each part.
+- **Choose the sounds**: pianos, harpsichord, clavier (clavichord and fortepiano), harps, classical guitar, choir, flute, recorder, oboe, clarinet, bassoon, strings, and C64 and chiptune sounds, for each part.
 - **Save it**: **Save score** keeps everything in one file to open again later. Export as MIDI (every part, the piano only, or the parts you tick), MusicXML or PDF.
 
 The reader handles scores with several staves, piano parts with chords and two voices, lyrics, slurs, ties, dynamics, hairpins and tempo words. Everything runs in the browser; nothing is uploaded.
