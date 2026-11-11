@@ -18,6 +18,10 @@ function estimateSkew(imgData){
   for (let deg = -4; deg <= 4; deg += 0.25) { const s = score(deg * Math.PI / 180); if (s > bestS) { bestS = s; best = deg; } }
   let fine = best;
   for (let deg = best - 0.25; deg <= best + 0.25; deg += 0.05) { const s = score(deg * Math.PI / 180); if (s > bestS) { bestS = s; fine = deg; } }
+  // A straight page can measure as very slightly tilted: at this small size a tenth of a degree moves hardly a dot, so
+  // straight and slightly tilted score almost the same and chance picks one. A very small tilt is only kept when it
+  // is clearly better than no tilt at all (turning a straight page by a tenth of a degree breaks its staff lines).
+  if (fine !== 0 && Math.abs(fine) <= 0.151 && score(0) >= 0.99 * bestS) return 0;
   return fine * Math.PI / 180;
 }
 
@@ -1783,9 +1787,16 @@ function omrTimeBar(staffEvs, cap, p, short, sureCap) {
     const sum = S.reduce((a, e) => a + e.d, 0); if (!sureCap || !(sum > cap + 0.01) || S.length > 40) return false;
     const ok3 = i => i + 2 < S.length && [0, 1, 2].every(k => S[i + k].kind === 'note' && !S[i + k].dotted && S[i + k].d === S[i].d) && S[i].d <= 16 && S[i].d >= 2;
     const pick = []; let found = null, steps = 0;
+    // (a note read too long, a missed flag say, also makes a voice too long. Then the notes of the supposed triplet
+    //  stand in line with plain notes of another staff whose bar adds up: no triplet there)
+    const agrees = pk => { let t = 0;
+      for (let i = 0; i < S.length; i++) { const k = pk.find(q => i >= q && i < q + 3), d = k != null ? S[i].d * 2 / 3 : S[i].d;
+        for (const o of cols[S[i].col].es) if (o !== S[i] && !S.includes(o) && o.ta != null && Math.abs(o.ta - Math.round(t * 12) / 12) > 0.01) return false;
+        t += d; }
+      return true; };
     const walk = (i, t) => {
       if (found || ++steps > 4000) return;
-      if (i >= S.length) { if (Math.abs(t - cap) < 0.01) found = pick.slice(); return; }
+      if (i >= S.length) { if (Math.abs(t - cap) < 0.01 && agrees(pick)) found = pick.slice(); return; }
       if (t > cap + 0.01) return;
       if (ok3(i) && Math.abs(t / (2 * S[i].d) - Math.round(t / (2 * S[i].d))) < 0.01) { pick.push(i); walk(i + 3, t + 2 * S[i].d); pick.pop(); }
       walk(i + 1, t + S[i].d);
@@ -1795,9 +1806,10 @@ function omrTimeBar(staffEvs, cap, p, short, sureCap) {
     for (const i of found) for (let k = 0; k < 3; k++) { S[i + k].d = S[i + k].d * 2 / 3; S[i + k].tu = 3; }
     return true;
   };
-  if (cap) staffEvs.forEach(evs => {
+  if (cap) for (const trip of [false, true]) staffEvs.forEach(evs => {
     const E = evs.filter(e => !e.whole).sort((a, b) => a.x - b.x); if (!E.length) return;
-    const fits = S => S.length > 0 && (Math.abs(S.reduce((a, e) => a + e.d, 0) - cap) < 0.01 || triplets(S));
+    if (trip && E.every(e => e.ta != null)) return;
+    const fits = S => S.length > 0 && (Math.abs(S.reduce((a, e) => a + e.d, 0) - cap) < 0.01 || (trip && triplets(S)));
     const set = S => { let t = 0; S.forEach(e => { e.ta = Math.round(t * 12) / 12; t += e.d; }); };
     if (!E.some((e, i) => i && e.col === E[i - 1].col)) { if (fits(E)) set(E); return; }
     // two voices: stems up and stems down, with the rests in one of them
@@ -1894,7 +1906,7 @@ function omrLyrics(page) {
     const by = st.sec && st.sec.by ? st.sec.by : '', title = st.sec && st.sec.title ? st.sec.title : '';
     for (const l of lines) {
       l.w.sort((a, b) => a.x - b.x);
-      const runs = []; for (const t of l.w) { const r = runs[runs.length - 1]; if (r && t.x - r.x1 < 2.5 * t.size) { r.s += ' ' + t.str; r.x1 = t.x + 0.45 * t.size * t.str.length; } else runs.push({ x: t.x, x1: t.x + 0.45 * t.size * t.str.length, s: t.str }); }
+      const runs = []; for (const t of l.w) { const r = runs[runs.length - 1]; if (r && t.x - r.x1 < 2.5 * t.size) { r.s += ' ' + t.str; r.x1 = t.x + 0.45 * t.size * t.str.length; r.ts.push(t); } else runs.push({ x: t.x, x1: t.x + 0.45 * t.size * t.str.length, s: t.str, ts: [t] }); }
       for (const r of runs) {
         let s = r.s.replace(/\s+/g, ' ').trim(); if (!s || s.length > 40 || (by && by.includes(s)) || (title && title.includes(s))) continue;
         { const mm = /^[a-zA-Z]?\s*=\s*(\d+)$/.exec(s); if (mm) s = '\u2669 = ' + mm[1]; }
@@ -1902,6 +1914,7 @@ function omrLyrics(page) {
         let e = st.pe.find(q => q.x >= r.x - 2.5 * p) || st.pe[0];
         if (r.x < st.pe[0].x) e = st.pe[0];
         e.tx = (e.tx ? e.tx + '\n' : '') + s;
+        r.ts.forEach(t => { t.mark = true; });   // (not also words sung by the voice above)
       }
     }
   });
@@ -1914,7 +1927,7 @@ function omrLyrics(page) {
     if (!st.pe || !st.pe.length || st.kb === 'L') return;   // (under the piano's lower staff stand footers and pedal marks, not words to sing)
     const p = st.p, next = page.staves[si + 1], ya = st.bot + 0.8 * p, yb = next && next.top > st.bot ? Math.min(st.bot + 13 * p, next.top - 0.4 * p) : st.bot + 13 * p;   // (room for three or four verses)
     const notes = st.pe.filter(e => e.kind === 'note'); if (!notes.length) return;
-    const words = page.texts.filter(t => t.y > ya && t.y < yb && t.x > st.musicStart - 2 * p && t.size >= 1.1 * p && t.size <= 3.6 * p && /[A-Za-zÀ-ɏ&]/.test(t.str) && !OMR_DYNW.test(t.str.trim())).sort((a, b) => a.y - b.y || a.x - b.x);
+    const words = page.texts.filter(t => t.y > ya && t.y < yb && t.x > st.musicStart - 2 * p && t.size >= 1.1 * p && t.size <= 3.6 * p && /[A-Za-zÀ-ɏ&]/.test(t.str) && !t.mark && !OMR_DYNW.test(t.str.trim())).sort((a, b) => a.y - b.y || a.x - b.x);
     if (words.length < 2) return;
     const dashes = page.texts.filter(t => t.y > ya && t.y < yb && /^[-–]+$/.test(t.str));
     const lines = []; words.forEach(t => { const l = lines.find(q => Math.abs(q.y - t.y) < 0.6 * p); if (l) l.w.push(t); else lines.push({ y: t.y, w: [t] }); });

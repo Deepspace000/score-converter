@@ -226,7 +226,7 @@ body.bmpick #recscore,body.bmpick #recscore *{cursor:url("data:image/svg+xml,%3C
 </div>
 
 <script src="vexflow.js"></script>
-<script src="omr.js?v=3.1"></script>
+<script src="omr.js?v=3.2"></script>
 <script>
 const {Renderer,Stave,StaveNote,Voice,Formatter,Accidental,Dot,Beam,StaveTie,Barline,Volta,GhostNote,StaveConnector,Tuplet,Fraction,Articulation,Curve,GraceNote,GraceNoteGroup,Glyph} = Vex.Flow;
 // (parts of the page that are not there answer with a stand-in, so nothing depends on them)
@@ -234,7 +234,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.14';
+const APP_VERSION='5.15';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
