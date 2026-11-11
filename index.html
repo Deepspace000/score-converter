@@ -67,6 +67,13 @@ body.bmpick #recscore,body.bmpick #recscore *{cursor:url("data:image/svg+xml,%3C
 /* tidying a photo before it is read */
 #tidy{position:fixed;inset:10px;z-index:35;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 40px rgba(15,23,42,.35);padding:12px;display:none;flex-direction:column;gap:8px}
 #tidy.open{display:flex}
+#zipDlg{position:fixed;inset:0;z-index:40;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center}
+#zipDlg.open{display:flex}
+#zipDlg .zbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 40px rgba(15,23,42,.35);padding:16px;width:min(560px,92vw);max-height:82vh;display:flex;flex-direction:column;gap:10px}
+#zipDlg b{font-size:16px}
+#zipList{display:flex;flex-direction:column;gap:6px;overflow:auto}
+#zipList button{text-align:left;padding:8px 10px}
+#zipList .zh{font-size:12px;color:#64748b;margin-top:6px}
 #tidy b{font-size:16px}
 #tdBody{flex:1;min-height:0;display:flex;gap:10px}
 #tdBody>div{flex:1;min-width:0;min-height:0;display:flex;align-items:center;justify-content:center;background:#e2e8f0;border-radius:6px;overflow:hidden}
@@ -96,7 +103,7 @@ body.bmpick #recscore,body.bmpick #recscore *{cursor:url("data:image/svg+xml,%3C
 <body>
 <div id="topbar">
   <span class="appname">Score Converter</span><span id="ver"></span>
-  <button id="impBtn" class="primary" title="Printed music as a PDF or a picture, or a MusicXML, MIDI or saved score file">Open score…</button>
+  <button id="impBtn" class="primary" title="Printed music as a PDF or a picture, or a MusicXML, MIDI or saved score file. A zip file of any of these opens too.">Open score…</button>
   <button id="pagesBtn" style="display:none" title="Look at the printed pages again, to compare them with the score or to scan more of them">Printed pages</button>
   <button id="photoBtn" title="Photos of printed music, from the camera or from your pictures. You tidy each one before it is read.">Photo…</button>
   <button id="playBtn">▶ Play</button>
@@ -115,7 +122,7 @@ body.bmpick #recscore,body.bmpick #recscore *{cursor:url("data:image/svg+xml,%3C
   <button class="fold" data-p="pParts" title="Mute, solo, volume, pan and sound of each part">Parts ▾</button>
   <button class="fold" data-p="pFile" title="Save the score, or export it as MIDI, MusicXML or PDF">Save ▾</button>
   <button id="wipeBtn" title="Delete everything in the score (asks first)">Clear</button>
-  <input type="file" id="impFile" accept=".json,.mid,.midi,.musicxml,.xml,.pdf,image/*" multiple style="display:none">
+  <input type="file" id="impFile" accept=".json,.mid,.midi,.musicxml,.xml,.mxl,.pdf,.zip,image/*" multiple style="display:none">
   <input type="file" id="photoFile" accept="image/*" multiple style="display:none">
 </div>
 
@@ -179,6 +186,11 @@ body.bmpick #recscore,body.bmpick #recscore *{cursor:url("data:image/svg+xml,%3C
 <div id="statusLine"><span class="score" id="recstat"></span></div>
 <div id="scoreBox"><h2 id="rectitle"></h2><div id="recscore"></div></div>
 
+<div id="zipDlg"><div class="zbox">
+  <b id="zipTitle"></b>
+  <div id="zipList"></div>
+  <div style="text-align:right"><button id="zipCancel">Cancel</button></div>
+</div></div>
 <div id="tidy">
   <div class="controls">
     <b>Tidy up the photo</b><span id="tdCount" class="score"></span>
@@ -222,7 +234,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.13';
+const APP_VERSION='5.14';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -1211,7 +1223,7 @@ function drawScore(el){
   const T=isTenorPart(part())?TR():0,KK=k=>T?wrKey(k):k;   // (the tenor part of a viol in E played with G fingering)
   $('rectitle').textContent=$('title').value||'Score';
   const nReal=sc.items.length,bars=splitBars(viewItems(),part().pb);
-  if(!bars.length){el.innerHTML='<div class="ph"><b>Open a score to begin</b>A PDF or a picture of printed music, or a MusicXML, MIDI or saved score file.<br>Press Open score, or drop the file here.</div>';noteEls=new Map();return;}
+  if(!bars.length){el.innerHTML='<div class="ph"><b>Open a score to begin</b>A PDF or a picture of printed music, or a MusicXML, MIDI or saved score file, or a zip file of them.<br>Press Open score, or drop the file here.</div>';noteEls=new Map();return;}
   const W=Math.max(340,((el.clientWidth||900)-12)/st.zoom);   // drawn narrower and stretched to the width: bigger music
   const ksW=k=>Math.abs(k)*11+(k?8:0),tsW=34;
   const nw=p=>26+p.d*0.5;
@@ -1339,7 +1351,7 @@ function drawFullScore(el){
   $('rectitle').textContent=$('title').value||'Score';
   const cols=fullColumns(),NP=sc.parts.length,TP=sc.parts.map(p=>isTenorPart(p)?TR():0),KP=TP.map(t=>k=>t?wrKey(k):k);
   noteElsAll=sc.parts.map(()=>new Map());noteEls=noteElsAll[sc.pi];selEl=null;
-  if(!cols.length){el.innerHTML='<div class="ph"><b>Open a score to begin</b>A PDF or a picture of printed music, or a MusicXML, MIDI or saved score file.<br>Press Open score, or drop the file here.</div>';return;}
+  if(!cols.length){el.innerHTML='<div class="ph"><b>Open a score to begin</b>A PDF or a picture of printed music, or a MusicXML, MIDI or saved score file, or a zip file of them.<br>Press Open score, or drop the file here.</div>';return;}
   const W=Math.max(340,((el.clientWidth||900)-12)/st.zoom),nameW=70;
   const ksW=k=>Math.abs(k)*11+(k?8:0),tsW=34,nw=p=>26+p.d*0.5;
   const headW=(b,first)=>50+ksW(b.key)+(first||b.sec?tsW:0);
@@ -2303,6 +2315,76 @@ async function scanMany(list){
   }finally{bar.classList.remove('on');$('pdfref').classList.remove('busy');$('scCancel').textContent='Cancel';}
   if(scan.stopped)scanInfo(`Stopped after ${done} of ${todo.length} pages. Nothing was put into the score. Press a Scan button to carry on (pages already read are kept).`);
 }
+// The files inside a zip file. No library is needed: the browser unpacks each file itself.
+function zipList(buf){
+  const u=new Uint8Array(buf),dv=new DataView(buf);let e=u.length-22;
+  while(e>=0&&dv.getUint32(e,true)!==0x06054b50)e--;
+  if(e<0)throw new Error('this is not a zip file');
+  const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const list=[];
+  if(n===0xffff||p===0xffffffff)throw new Error('this zip file is too large to open here');
+  for(let i=0;i<n&&p+46<=u.length&&dv.getUint32(p,true)===0x02014b50;i++){
+    const flags=dv.getUint16(p+8,true),method=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true);
+    const name=new TextDecoder().decode(u.subarray(p+46,p+46+nl));
+    p+=46+nl+xl+cl;
+    if(name.endsWith('/')||name.split('/').some(x=>x.startsWith('.')||x==='__MACOSX'))continue;   // (folders, hidden files)
+    list.push({name,method,cs,lo,locked:!!(flags&1)});
+  }
+  return {u,dv,list};
+}
+async function zipData(z,ent){
+  if(ent.locked)throw new Error('the zip file has a password');
+  const start=ent.lo+30+z.dv.getUint16(ent.lo+26,true)+z.dv.getUint16(ent.lo+28,true),raw=z.u.subarray(start,start+ent.cs);
+  if(ent.method===0)return raw;
+  if(ent.method!==8)throw new Error('the zip file is packed in a way that cannot be opened here');
+  if(typeof DecompressionStream==='undefined')throw new Error('this browser cannot open zip files: update it, or unpack the zip first');
+  return new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+}
+// A compressed MusicXML file (.mxl) is a zip with the score inside it.
+async function mxlText(f){
+  const z=zipList(await f.arrayBuffer()),dec=d=>new TextDecoder().decode(d);
+  let ent=null;const c=z.list.find(x=>x.name==='META-INF/container.xml');
+  if(c){const m=/full-path="([^"]+)"/.exec(dec(await zipData(z,c)));if(m)ent=z.list.find(x=>x.name===m[1]);}
+  if(!ent)ent=z.list.find(x=>!x.name.startsWith('META-INF/')&&/\.(musicxml|xml)$/i.test(x.name));
+  if(!ent)throw new Error('no score found inside the .mxl file');
+  return dec(await zipData(z,ent));
+}
+// Pictures that are read just as they are (no tidy-up page), one page each.
+async function openPages(files){
+  const imgs=[];for(const f of files)imgs.push(await loadImg(f));
+  scan.pages=[];scan.cur=0;scan.name=files[0].name;scan.kind='img';scan.pdf=null;scan.imgs=imgs;scan.n=imgs.length;scan.added=false;scan.wantW=0;scan.polyDoc=false;scan.ms=0;scanStep();
+  $('pdfref').classList.add('open');scanInfo('Opening the pictures…');await tick();
+  stat(`${imgs.length} picture${imgs.length>1?'s':''} opened. Press Scan ${imgs.length>1?'whole score':'this page'} to make the score.`);
+  await showScanPage(0);
+}
+// A zip file: its pictures become the pages of one score; a PDF, MusicXML, MIDI or saved score file in it opens as usual.
+// With more than one thing to open, a list asks which.
+const ZIP_TYPES={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',bmp:'image/bmp',gif:'image/gif',heic:'image/heic',heif:'image/heif',pdf:'application/pdf'};
+const zipKind=n=>{n=n.toLowerCase();return /\.(jpe?g|png|webp|bmp|gif|heic|heif)$/.test(n)?'pic':n.endsWith('.pdf')?'pdf':/\.(json|mid|midi|musicxml|xml|mxl)$/.test(n)?'score':null;};
+async function openZip(f){
+  const z=zipList(await f.arrayBuffer());
+  const use=z.list.filter(e=>zipKind(e.name)&&!e.name.startsWith('META-INF/')).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));   // (page2 before page10)
+  if(!use.length)throw new Error('no sheet music found in the zip file. It can hold pictures, PDFs, MusicXML, MIDI or saved score files.');
+  const file=async e=>new File([await zipData(z,e)],e.name.split('/').pop(),{type:ZIP_TYPES[e.name.split('.').pop().toLowerCase()]||''});
+  const files=async l=>{const o=[];for(const e of l)o.push(await file(e));return o;};
+  const pics=use.filter(e=>zipKind(e.name)==='pic'),others=use.filter(e=>zipKind(e.name)!=='pic');
+  if(!pics.length&&others.length===1){await loadFile(await file(others[0]));return;}
+  const list=$('zipList');list.innerHTML='';$('zipTitle').textContent='What to open from '+f.name;
+  const add=(label,title,go)=>{const b=document.createElement('button');b.textContent=label;if(title)b.title=title;
+    b.onclick=async()=>{$('zipDlg').classList.remove('open');try{await go();}catch(err){stat('Import failed: '+err.message);}};list.append(b);};
+  const head=t=>{const d=document.createElement('div');d.className='zh';d.textContent=t;list.append(d);};
+  if(pics.length){
+    const n=pics.length,what=n>1?`the ${n} pictures`:'the picture';
+    head(n>1?`${n} pictures (${pics[0].name.split('/').pop()} to ${pics[n-1].name.split('/').pop()}), in name order`:'1 picture ('+pics[0].name.split('/').pop()+')');
+    add(`Read ${what} as ${n>1?'they are':'it is'}`,'For clean scans: each picture is one page of the score',async()=>openPages(await files(pics)));
+    add(`Tidy ${what} first`,'For photos: straighten each one and even out the light before it is read',async()=>openPhotos(await files(pics)));
+  }
+  if(others.length){
+    head(others.length>1?'Other files':'Other file');
+    for(const e of others)add('Open '+e.name.split('/').pop(),e.name,async()=>loadFile(await file(e)));
+  }
+  $('zipDlg').classList.add('open');
+}
+$('zipCancel').onclick=()=>$('zipDlg').classList.remove('open');
 async function loadFile(f){
   const n=f.name.toLowerCase();
   try{
@@ -2331,7 +2413,9 @@ async function loadFile(f){
     }else if(n.endsWith('.musicxml')||n.endsWith('.xml')){
       const r=parseXml(await f.text());applyImported(r.items,r,f.name);
     }else if(n.endsWith('.mxl')){
-      throw new Error('compressed .mxl is not supported: export as uncompressed .musicxml or as MIDI');
+      const r=parseXml(await mxlText(f));applyImported(r.items,r,f.name);
+    }else if(n.endsWith('.zip')){
+      await openZip(f);
     }else if(n.endsWith('.pdf')){
       await openScan(f);
     }else if(f.type.startsWith('image/')||/\.(jpe?g|png|webp|bmp|gif|heic|heif)$/.test(n)){
