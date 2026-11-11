@@ -659,7 +659,7 @@ function analyzeBitmap(imgData, opts){
     // sharps and naturals: vertical strokes continue both above and below the filled centre
     // (on a piano page a full-sized solid head stays even with marks above and below it: its stem on one side, a slur,
     //  an accent or a fingering number on the other. The filled middle of a sharp or natural is much narrower.)
-    if (strokeCov(b, -1, p) >= 0.12 && strokeCov(b, 1, p) >= 0.12 && !stemThrough(b, p) && !(opts.thickLedger && w >= 1.0 * p && w <= 1.5 * p && h >= 0.75 * p && h <= 1.25 * p && (ellipseFill(b.cx, b.cy, p) >= 0.9 || smallTied(b, p)))) { R(b, 'strokes'); continue; }
+    if (strokeCov(b, -1, p) >= 0.12 && strokeCov(b, 1, p) >= 0.12 && !stemThrough(b, p) && !(opts.thickLedger && w <= 1.5 * p && h >= 0.75 * p && h <= 1.25 * p && ((w >= 1.0 * p && ellipseFill(b.cx, b.cy, p) >= 0.9) || (w >= 0.8 * p && smallTied(b, p))))) { R(b, 'strokes'); continue; }
     let heads = [];
     if (h >= 0.5 * p && h <= 1.5 * p) { if (b.area < 0.28 * p * p) { R(b, 'area'); continue; } heads.push({ x: b.cx, y: b.cy, tol: 0.3 }); }
     else if (h > 1.5 * p && h <= 3.5 * p && w <= 1.7 * p) { const n = Math.max(2, Math.round(h / p)); for (let k = 0; k < n; k++) heads.push({ x: b.cx, y: b.miny + (k + 0.5) * h / n, tol: 0.4 }); }
