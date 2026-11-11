@@ -173,6 +173,8 @@ body.bmpick #recscore,body.bmpick #recscore *{cursor:url("data:image/svg+xml,%3C
     <label>Time <select id="tsn"></select> / <select id="tsd"></select></label>
     <label title="Make the music bigger or smaller">Size <input type="range" id="zoom" min="0.6" max="1.6" step="0.05" value="1" style="width:110px"></label>
     <label title="Begin each line of music where the printed score began it"><input type="checkbox" id="origChk" checked> Lines as printed</label>
+    <label title="The letter name of each note, under the staff. It prints too."><input type="checkbox" id="namesChk"> Note names under the notes</label>
+    <label title="The sol-fa name of each note (do is the home note of the major key), under the staff. It prints too."><input type="checkbox" id="solfaChk"> Sol-fa under the notes</label>
   </div>
   <div class="controls">
     <label title="Read these bars again from the printed page, each on its own">Re-scan bars <input type="number" id="rsFrom" min="1" style="width:60px"> to <input type="number" id="rsTo" min="1" style="width:60px"></label>
@@ -254,7 +256,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.20';
+const APP_VERSION='5.21';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -339,8 +341,8 @@ function spell(m,key=st.key){ // -> {letter, off, oct, name, pcname, inKey, need
 }
 // movable do: do is the home note of the major key, so a minor key is la-based
 const SOLFA=['do','re','mi','fa','so','la','ti'],RAISE={do:'di',re:'ri',fa:'fi',so:'si',la:'li'},LOWER={re:'ra',mi:'me',so:'se',la:'le',ti:'te'};
-function solfa(m,key=st.key){
-  const sp=spell(m,key),tonic=KEYS.find(k=>k[0]===key)[1][0];
+function solfa(m,key=st.key,as){   // (as: the spelling printed in the score, when it is known)
+  const sp=as||spell(m,key),tonic=KEYS.find(k=>k[0]===key)[1][0];
   const s=SOLFA[(LET.indexOf(sp.letter)-LET.indexOf(tonic)+7)%7],alt=sp.off-keyAcc(key)[sp.letter];
   return alt>0?(RAISE[s]||s+'♯'):alt<0?(LOWER[s]||s+'♭'):s;
 }
@@ -1112,7 +1114,8 @@ const showNames=()=>$('namesChk').checked,showSolfa=()=>$('solfaChk').checked;
 function labelNotes(svg,notes,keys,stave){
   const rows=[];if(showNames())rows.push('n');if(showSolfa())rows.push('s');
   if(!rows.length)return;
-  const y0=stave.getYForLine(4)+48;
+  let drop=0;notes.forEach(sn=>{try{if(sn.ghost||!sn.getBoundingBox)return;const b=sn.getBoundingBox(),low=b.getY()+b.getH()-(stave.getYForLine(4)+30);if(low>drop)drop=Math.min(30,low);}catch(e){}});   // (clear of low notes and stems)
+  const y0=stave.getYForLine(4)+48+drop;
   notes.forEach((sn,i)=>{
     const k=keys[i];if(!k)return;
     let x;try{x=(sn.getNoteHeadBeginX()+sn.getNoteHeadEndX())/2;}catch(e){x=sn.getAbsoluteX()+6;}
@@ -1120,8 +1123,8 @@ function labelNotes(svg,notes,keys,stave){
       const t=document.createElementNS('http://www.w3.org/2000/svg','text');
       t.setAttribute('x',x.toFixed(1));t.setAttribute('y',(y0+ri*15).toFixed(1));t.setAttribute('text-anchor','middle');
       t.setAttribute('font-family',SCORE_FONT);t.setAttribute('font-size',r==='n'?'13':'12.5');
-      t.setAttribute('fill',r==='n'?'#2a2118':'#8a3b12');if(r==='s')t.setAttribute('font-style','italic');
-      t.textContent=r==='n'?(k.nm||spell(k.m,k.key).pcname):solfa(k.m,k.key);
+      t.setAttribute('fill',r==='n'?'#000':'#1e3a8a');t.setAttribute('stroke','#fff');t.setAttribute('stroke-width','3');t.setAttribute('paint-order','stroke');if(r==='s')t.setAttribute('font-style','italic');
+      t.textContent=r==='n'?(k.nm||spell(k.m,k.key).pcname):solfa(k.m,k.key,k.nm?{letter:k.nm[0],off:k.nm[1]==='♯'?1:k.nm[1]==='♭'?-1:0}:null);
       svg.appendChild(t);
     });
   });
@@ -2716,6 +2719,9 @@ $('tuneSel').onchange=()=>{
 };
 $('placeSel').onchange=()=>{st.place=$('placeSel').value;keep('score-conv-place',st.place==='all'?null:st.place);st.hl={};playing?paintPlay():drawNecks();};
 try{$('origChk').checked=localStorage.getItem('score-conv-lines')!=='0';}catch(e){}
+for(const [id,k] of [['namesChk','score-conv-names'],['solfaChk','score-conv-solfa']]){
+  try{$(id).checked=localStorage.getItem(k)==='1';}catch(e){}
+  $(id).onchange=()=>{keep(k,$(id).checked?'1':null);keepScroll(drawRecording);};}
 $('origChk').onchange=()=>{keep('score-conv-lines',$('origChk').checked?null:'0');keepScroll(drawRecording);};
 let zoomT=0;
 $('zoom').oninput=()=>{st.zoom=+$('zoom').value;clearTimeout(zoomT);zoomT=setTimeout(()=>{keepScroll(drawRecording);keep('score-conv-zoom2',String(st.zoom));},120);};
