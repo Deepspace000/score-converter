@@ -74,6 +74,10 @@ span.pname{min-width:0;color:var(--dim)}
 #pdfref{position:fixed;inset:10px;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 40px rgba(15,23,42,.35);padding:12px;display:none;flex-direction:column;gap:6px}
 #pdfref.open{display:flex}
 #pdfref b{color:var(--ink)!important;font-size:16px}
+#scBar{display:none;height:8px;border-radius:4px;background:#e2e8f0;overflow:hidden}
+#scBar.on{display:block}
+#scBar>div{height:100%;width:0;background:var(--acc);transition:width .3s}
+#pdfref.busy .controls button:not(#scCancel){opacity:.5;pointer-events:none}
 #scView{flex:1;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:6px;background:#fff}
 @media print{
   html,body{height:auto}
@@ -199,6 +203,7 @@ span.pname{min-width:0;color:var(--dim)}
     <button id="scCancel" title="Leave this page without scanning anything">Cancel</button>
   </div>
   <div id="scStep" class="hint" style="margin-top:0"></div>
+  <div id="scBar"><div></div></div>
   <div class="score" id="scInfo"></div>
   <div class="controls" style="font-size:12px"><span class="score" style="font-size:12px">Marks on the page show what was read: B breve, S semibreve, M minim, C crotchet, Q quaver, q semiquaver, a dot means dotted, r is a rest, green lines are bar lines.</span>
     <label title="Tick this if the key signature was read wrongly: choose the right key under Edit first" style="font-size:12px"><input type="checkbox" id="scKey"> Use the key chosen under Edit</label></div>
@@ -206,7 +211,7 @@ span.pname{min-width:0;color:var(--dim)}
 </div>
 
 <script src="vexflow.js"></script>
-<script src="omr.js?v=2.6"></script>
+<script src="omr.js?v=2.7"></script>
 <script>
 const {Renderer,Stave,StaveNote,Voice,Formatter,Accidental,Dot,Beam,StaveTie,Barline,Volta,GhostNote,StaveConnector,Tuplet,Fraction,Articulation,Curve,GraceNote,GraceNoteGroup,Glyph} = Vex.Flow;
 // (parts of the page that are not there answer with a stand-in, so nothing depends on them)
@@ -214,7 +219,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.7';
+const APP_VERSION='5.8';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -1805,7 +1810,7 @@ async function ensurePdfJs(){
 const tick=()=>new Promise(r=>setTimeout(r,20));
 function scanInfo(t){$('scInfo').textContent=t;}
 async function openScan(f){
-  scan.pages=[];scan.cur=0;scan.name=f.name;scan.added=false;scan.kind=f.name.toLowerCase().endsWith('.pdf')?'pdf':'img';scan.n=1;scanStep();
+  scan.pages=[];scan.cur=0;scan.name=f.name;scan.added=false;scan.wantW=0;scan.polyDoc=false;scan.ms=0;scan.kind=f.name.toLowerCase().endsWith('.pdf')?'pdf':'img';scan.n=1;scanStep();
   $('pdfref').classList.add('open');scanInfo('Opening '+f.name+'…');await tick();
   if(f.name.toLowerCase().endsWith('.pdf')){
     await ensurePdfJs();
@@ -1843,12 +1848,17 @@ const TOUCH=navigator.maxTouchPoints>0||matchMedia('(pointer:coarse)').matches;
 const freeCanvas=c=>{c.width=c.height=0;};
 async function readScanPage(i){
   if(scan.pages[i])return scan.pages[i];
-  let W=2000,c=await renderScan(i,W);
-  let page=omrReadPage(c.getContext('2d',{willReadFrequently:true}).getImageData(0,0,c.width,c.height));
+  const tRead=performance.now();
+  const rd=cv=>{const im=cv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,cv.width,cv.height);
+    if(scan.polyDoc){const pg=omrReadPage(im,true);if(pg.staves.length)pg.poly=true;return pg;}return omrReadPage(im);};
+  let W=(scan.kind==='pdf'&&scan.wantW)||2000,c=await renderScan(i,W);
+  let page=rd(c);
   if(page.U>0&&page.U<24){   // small staves lose thin notehead rings: read again larger
     const want=Math.min(TOUCH?2400:3200,Math.round(W*26/page.U));
-    if(want>W+100){W=want;freeCanvas(c);c=await renderScan(i,W);page=omrReadPage(c.getContext('2d',{willReadFrequently:true}).getImageData(0,0,c.width,c.height));}
+    if(want>W+100){W=want;freeCanvas(c);c=await renderScan(i,W);page=rd(c);}
   }
+  if(page.U>0&&scan.kind==='pdf')scan.wantW=W;
+  if(page.poly)scan.polyDoc=true;
   // keep only a compressed picture of the page for showing it
   const dw=Math.min(1500,c.width),base=document.createElement('canvas');
   base.width=dw;base.height=Math.round(c.height*dw/c.width);base.getContext('2d').drawImage(c,0,0,base.width,base.height);
@@ -1859,6 +1869,7 @@ async function readScanPage(i){
   const k=dw/c.width;freeCanvas(c);
   const blob=await new Promise(r=>base.toBlob(r,'image/jpeg',0.85));freeCanvas(base);
   page.no=i;
+  if(page.staves.length){const dt=performance.now()-tRead;scan.ms=scan.ms?0.6*scan.ms+0.4*dt:dt;}   // (a title page is quick and says nothing about the others)
   return scan.pages[i]={page,blob,k};
 }
 function printedTs(){for(const sp of scan.pages)if(sp)for(const s of sp.page.staves)if(s.ts)return s.ts;return null;}
@@ -2020,7 +2031,7 @@ $('scPrev').onclick=()=>showScanPage(scan.cur-1);
 $('scNext').onclick=()=>showScanPage(scan.cur+1);
 $('scRead').onclick=async()=>{await showScanPage(scan.cur);if(scan.pages[scan.cur]){addScanned([scan.pages[scan.cur]]);$('pdfref').classList.remove('open');}};
 $('scAll').onclick=async()=>{
-  for(let i=0;i<scan.n;i++){if(!scan.pages[i]){scanInfo(`Reading page ${i+1} of ${scan.n}…`);await tick();try{await readScanPage(i);}catch(err){console.error(err);}}}
+  await scanMany(Array.from({length:scan.n},(x,i)=>i));if(scan.stopped)return;
   await drawScanPage(scan.cur);scanInfo(pageSummary(scan.pages[scan.cur]));
   const got=scan.pages.filter(Boolean);
   if(!got.length){scanInfo('No page of this file could be read.');return;}
@@ -2032,7 +2043,7 @@ function pageList(txt,n){const out=[];String(txt).replace(/\s*[-–]\s*/g,'-').s
 $('scSome').onclick=async()=>{
   const want=pageList($('scPages').value,scan.n);
   if(!want.length){scanInfo(`Type the pages to read, for example 5-6 or 2,4-6. This score has ${scan.n} page${scan.n===1?'':'s'}.`);return;}
-  for(const i of want){if(!scan.pages[i]){scanInfo(`Reading page ${i+1}…`);await tick();try{await readScanPage(i);}catch(err){console.error(err);}}}
+  await scanMany(want);if(scan.stopped)return;
   const got=want.map(i=>scan.pages[i]).filter(Boolean);if(!got.length){scanInfo('Those pages could not be read.');return;}
   addScanned(got);$('pdfref').classList.remove('open');
 };
@@ -2264,10 +2275,29 @@ async function openPhotos(files){
   const out=[];
   for(let i=0;i<files.length;i++){const img=await loadImg(files[i]),c=await tidyPhoto(img,i,files.length);if(!c)break;out.push(c);}
   if(!out.length){stat('No photo was taken in.');return;}
-  scan.pages=[];scan.cur=0;scan.name=files[0].name;scan.kind='img';scan.pdf=null;scan.imgs=out;scan.n=out.length;scan.added=false;scanStep();
+  scan.pages=[];scan.cur=0;scan.name=files[0].name;scan.kind='img';scan.pdf=null;scan.imgs=out;scan.n=out.length;scan.added=false;scan.wantW=0;scan.polyDoc=false;scan.ms=0;scanStep();
   $('pdfref').classList.add('open');scanInfo('Reading the photo…');await tick();
   stat(`${out.length} photo${out.length>1?'s':''} tidied. Press Scan ${out.length>1?'whole score':'this score'} to make the score.`);
   await showScanPage(0);
+}
+// Reads the pages of the list that have not been read yet, saying which page it is on and about how long is left.
+const timeLeft=sec=>sec<8?'a few seconds':sec<50?`about ${Math.max(10,Math.round(sec/10)*10)} seconds`:sec<100?'about 1 minute':`about ${Math.round(sec/60)} minutes`;
+async function scanMany(list){
+  scan.stop=false;scan.stopped=false;
+  const todo=list.filter(i=>!scan.pages[i]);if(!todo.length)return;
+  const bar=$('scBar'),fill=bar.firstElementChild,t0=performance.now();let done=0;
+  bar.classList.add('on');$('pdfref').classList.add('busy');fill.style.width='0';scan.stop=false;scan.stopped=false;$('scCancel').textContent='Stop scanning';
+  try{
+    for(const i of todo){
+      if(scan.stop){scan.stopped=true;break;}
+      const per=done?(performance.now()-t0)/done:scan.ms||0,left=per?per*(todo.length-done)/1000:0;
+      scanInfo(`Scanning page ${i+1} (${done+1} of ${todo.length})…`+(left?` ${timeLeft(left)[0].toUpperCase()+timeLeft(left).slice(1)} left.`:''));
+      await tick();
+      try{await readScanPage(i);}catch(err){console.error(err);}
+      done++;fill.style.width=Math.round(100*done/todo.length)+'%';
+    }
+  }finally{bar.classList.remove('on');$('pdfref').classList.remove('busy');$('scCancel').textContent='Cancel';}
+  if(scan.stopped)scanInfo(`Stopped after ${done} of ${todo.length} pages. Nothing was put into the score. Press a Scan button to carry on (pages already read are kept).`);
 }
 async function loadFile(f){
   const n=f.name.toLowerCase();
@@ -2479,7 +2509,7 @@ function scanStep(){
   $('pagesBtn').style.display=scan.kind?'':'none';
 }
 $('pdfClose').onclick=()=>{if(!scan.added&&scan.kind){$('scAll').click();return;}$('pdfref').classList.remove('open');stat(scan.added?'This is the scanned copy. Printed pages (top left) shows the print again.':'');};
-$('scCancel').onclick=()=>{$('pdfref').classList.remove('open');if(!scan.added)stat('Nothing was scanned. Printed pages (top left) opens the print again.');};
+$('scCancel').onclick=()=>{if($('pdfref').classList.contains('busy')){scan.stop=true;scanInfo('Stopping after this page…');return;}$('pdfref').classList.remove('open');if(!scan.added)stat('Nothing was scanned. Printed pages (top left) opens the print again.');};
 $('pagesBtn').onclick=async()=>{if(!scan.kind)return;stopPlay();$('pdfref').classList.add('open');scanStep();await showScanPage(scan.cur);};
 // the whole score, as saved in a .json file (and kept on this device)
 const scoreData=()=>({app:'score-converter',bm:(sc.bm||[]).slice(),tr:sc.tr||0,trS:sc.trS||0,src:sc.scanName||'',version:3,title:$('title').value,key:st.key,clef:st.clef,bpm:sc.bpm,ts:sc.ts,reverb:sc.reverb,part:sc.pi,neckPart:sc.neckPart,
