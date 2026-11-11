@@ -2004,11 +2004,11 @@ function omrPolyItems(pages, plan, clef, fifthsOverride, barT) {
   pages.forEach(omrLyrics);
   const parts = plan.map(() => ({ items: [], v2: [], two: false, tied: {} }));
   const R12 = x => Math.round(x * 12) / 12;
-  let nBars = 0, nBad = 0;
+  let nBars = 0, nBad = 0; const badList = [];
   for (const page of pages) for (const sy of omrPolySystems(page, barT)) {
     const top = sy.grp[0], secSrc = sy.grp.find(s => s.sec);
     sy.bars.forEach((bar, bi) => {
-      nBars++; if (bar.bad) nBad++;
+      nBars++; if (bar.bad) { nBad++; badList.push(nBars - 1); }
       const mid = (bar.x0 + bar.x1) / 2, vol = (top.voltas || []).find(v => mid >= v.x0 && mid <= v.x1), L = bar.L;
       parts.forEach((P, pi) => {
         const gi = sy.grp.findIndex(s => s.part === pi), st = gi >= 0 ? sy.grp[gi] : null;
@@ -2090,7 +2090,7 @@ function omrPolyItems(pages, plan, clef, fifthsOverride, barT) {
       });
     });
   }
-  return { parts: parts.map(P => ({ items: P.items, v2: P.two ? P.v2 : null })), bars: nBars, bad: nBad };
+  return { parts: parts.map(P => ({ items: P.items, v2: P.two ? P.v2 : null })), bars: nBars, bad: nBad, badList };
 }
 
 // Draws what was read on top of the page picture: ctx is scaled so that page pixels are used.

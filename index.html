@@ -213,6 +213,7 @@ body.bmpick #recscore,body.bmpick #recscore *{cursor:url("data:image/svg+xml,%3C
     <button id="scAll" class="primary" title="Read every page and make the score from them">Scan whole score</button>
     <button id="scRead" title="Read only the page shown here">Scan this page</button>
     <span id="scSomeBox" class="controls"><label title="For example 5-6, or 2,4-6">Pages <input type="text" id="scPages" placeholder="e.g. 5-6" style="width:86px"></label><button id="scSome">Scan these pages</button></span>
+    <label title="Slower, more accurate: every bar that does not add up is read again in nine different ways, and the reading most of them agree on is kept"><input type="checkbox" id="scCareful"> Careful scan (slower)</label>
     <span style="flex:1"></span>
     <button id="pdfClose" class="primary" title="Leave this page and go to the score made from it. If nothing has been scanned yet, the whole score is scanned first.">Go to scanned copy now</button>
     <button id="scCancel" title="Leave this page without scanning anything">Cancel</button>
@@ -226,7 +227,7 @@ body.bmpick #recscore,body.bmpick #recscore *{cursor:url("data:image/svg+xml,%3C
 </div>
 
 <script src="vexflow.js"></script>
-<script src="omr.js?v=3.3"></script>
+<script src="omr.js?v=3.4"></script>
 <script>
 const {Renderer,Stave,StaveNote,Voice,Formatter,Accidental,Dot,Beam,StaveTie,Barline,Volta,GhostNote,StaveConnector,Tuplet,Fraction,Articulation,Curve,GraceNote,GraceNoteGroup,Glyph} = Vex.Flow;
 // (parts of the page that are not there answer with a stand-in, so nothing depends on them)
@@ -234,7 +235,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.16';
+const APP_VERSION='5.17';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -1823,7 +1824,9 @@ async function ensurePdfJs(){
   await loadScript('lib/pdf.min.js');
   pdfjsLib.GlobalWorkerOptions.workerSrc='lib/pdf.worker.min.js';
 }
-const tick=()=>new Promise(r=>setTimeout(r,20));
+// a short pause that lets the page show what it is doing. (A browser slows the timers of a page that is not in front
+// to one a minute, which made scanning in a background tab crawl: if the timer is late, a message does the waiting.)
+const tick=()=>new Promise(r=>{let done=false;const fin=()=>{if(!done){done=true;r();}};setTimeout(fin,20);const t0=performance.now(),c=new MessageChannel();c.port1.onmessage=()=>{if(done)return;if(performance.now()-t0>80)fin();else c.port2.postMessage(0);};c.port2.postMessage(0);});
 function scanInfo(t){$('scInfo').textContent=t;}
 async function openScan(f){
   scan.pages=[];scan.cur=0;scan.name=f.name;scan.added=false;scan.wantW=0;scan.polyDoc=false;scan.ms=0;scan.kind=f.name.toLowerCase().endsWith('.pdf')?'pdf':'img';scan.n=1;scanStep();
@@ -2007,7 +2010,7 @@ function addScannedPoly(all,pages,override){
   else made.forEach((m,i)=>{const p=sc.parts[i]||(sc.parts[i]=newPart(m.name,m.clef,m.sound,m.pan));p.hist.push(JSON.stringify(p.items));p.items=p.items.concat(m.items);});
   sc.pi=0;sc.sel=-1;sc.cur=sc.items.length;
   if(fresh){
-    sc.neckPart=0;sc.scanName=scan.name;sc.trS=0;sc.tr=0;sc.bm=[];
+    sc.neckPart=0;sc.scanName=scan.name;sc.trS=0;sc.tr=0;sc.bm=[];sc.badBars=res.badList||[];
     {const mk=made.flatMap(m=>m.items).find(x=>x.tx&&/=\s*\d+/.test(x.tx)),n=mk?+/=\s*(\d+)/.exec(mk.tx)[1]:0;if(n>=30&&n<=240){sc.bpm=n;$('bpm').value=n;}}
     const f=pages.flatMap(pg=>pg.staves).find(s=>s.pe&&s.pe.length);
     const k=f?(f.keyFinal!=null?f.keyFinal:f.fifths):null;
@@ -2045,7 +2048,7 @@ function addScannedPart(list,override,barT){
 }
 $('scPrev').onclick=()=>showScanPage(scan.cur-1);
 $('scNext').onclick=()=>showScanPage(scan.cur+1);
-$('scRead').onclick=async()=>{await showScanPage(scan.cur);if(scan.pages[scan.cur]){addScanned([scan.pages[scan.cur]]);$('pdfref').classList.remove('open');}};
+$('scRead').onclick=async()=>{await showScanPage(scan.cur);if(scan.pages[scan.cur]){addScanned([scan.pages[scan.cur]]);$('pdfref').classList.remove('open');if($('scCareful').checked)await carefulPass();}};
 $('scAll').onclick=async()=>{
   await scanMany(Array.from({length:scan.n},(x,i)=>i));if(scan.stopped)return;
   await drawScanPage(scan.cur);scanInfo(pageSummary(scan.pages[scan.cur]));
@@ -2053,6 +2056,7 @@ $('scAll').onclick=async()=>{
   if(!got.length){scanInfo('No page of this file could be read.');return;}
   addScanned(got);
   $('pdfref').classList.remove('open');
+  if($('scCareful').checked)await carefulPass();
 };
 // "5-6", "2, 4-6": the pages to read (counted from 1)
 function pageList(txt,n){const out=[];String(txt).replace(/\s*[-–]\s*/g,'-').split(/[,;\s]+/).forEach(t=>{const m=/^(\d+)(?:-(\d+))?$/.exec(t);if(!m)return;let a=+m[1],b=m[2]?+m[2]:a;if(a>b)[a,b]=[b,a];for(let i=a;i<=b;i++)if(i>=1&&i<=n&&!out.includes(i-1))out.push(i-1);});return out.sort((x,y)=>x-y);}
@@ -2062,6 +2066,7 @@ $('scSome').onclick=async()=>{
   await scanMany(want);if(scan.stopped)return;
   const got=want.map(i=>scan.pages[i]).filter(Boolean);if(!got.length){scanInfo('Those pages could not be read.');return;}
   addScanned(got);$('pdfref').classList.remove('open');
+  if($('scCareful').checked)await carefulPass();
 };
 $('scPages').onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')$('scSome').click();};
 /* ---- reading a few bars again, each on its own ----
@@ -2117,12 +2122,16 @@ async function rsRead(k,M,G,sp){
   const ka=M.ctx?Math.max(G.first,k-1):k,kb=M.ctx?Math.min(G.last,k+1):k;if(M.ctx&&ka===kb)return null;
   const x0=G.bx(ka)*p,x1=kb<G.last?G.bx(kb+1)*p:right;
   const gi=page.staves.indexOf(grp[0]),prev=page.staves[gi-1],next=page.staves[gi+grp.length],PH=page.H||1e9;
-  const Fz=M.F,ck=G.pg+':'+Fz;let c=rsCache.get(ck);if(!c){c=await renderScan(G.pg,Math.round(page.W*Fz));rsCache.set(ck,c);}
+  const Fz=M.F,ck=G.pg+':'+Fz;let c=rsCache.get(ck);
+  if(!c&&rsRead.fast&&Fz!==1){   // (careful scan: the page is drawn once and that picture is made larger or smaller, which is much quicker)
+    let b0=rsCache.get(G.pg+':1');if(!b0){b0=await renderScan(G.pg,page.W);rsCache.set(G.pg+':1',b0);}
+    c=document.createElement('canvas');c.width=Math.round(b0.width*Fz);c.height=Math.round(b0.height*Fz);const cg=c.getContext('2d',{willReadFrequently:true});cg.imageSmoothingQuality='high';cg.drawImage(b0,0,0,c.width,c.height);rsCache.set(ck,c);}
+  if(!c){c=await renderScan(G.pg,Math.round(page.W*Fz));rsCache.set(ck,c);}
   const hx=Math.min(...grp.map(x=>x.musicStart))-0.25*p,L0=Math.max(0,left-3*p),xe=Math.min(page.W,x1+0.5*p);
   const segs=x0>0?[[L0,hx],[x0+0.3*p,xe]]:[[L0,xe]],gap=x0>0?Math.round(1.5*p*Fz):0;
   const band=(j0,j1)=>{const up=j0?grp[j0-1]:prev,dn=j1+1<grp.length?grp[j1+1]:next;return [Math.max(0,grp[j0].top-7*p,up?(up.bot+grp[j0].top)/2:0),Math.min(PH,grp[j1].bot+7*p,dn?(grp[j1].bot+dn.top)/2:PH)];};
   const jobs=M.solo?grp.map((x,j)=>[j]):[grp.map((x,j)=>j)];if(M.solo&&grp.length<2)return null;
-  const per=[],count=kb-ka+1,sum=l=>l.reduce((t,x)=>t+x.d,0);
+  const per=[],count=kb-ka+1,sum=l=>l.reduce((t,x)=>t+x.d,0);per.bad=0;
   for(const js of jobs){
     const [yT,yB]=band(js[0],js[js.length-1]),o=rsCut(c,segs,gap,yT,yB,Fz,p);if(M.ink)rsInk(o,M.ink);rescanOne.last=o;
     const np=omrReadPage(o.getContext('2d',{willReadFrequently:true}).getImageData(0,0,o.width,o.height),true);np.no=0;np.texts=[];np.poly=true;
@@ -2131,7 +2140,7 @@ async function rsRead(k,M,G,sp){
     np.staves.forEach(x=>{x.forceSec=false;x.pieceNo=1;});
     plan.forEach((pl,q)=>omrSettle([{...np,staves:np.staves.filter(x=>x.part===q)}],pl.clef||st.clef));
     np.staves.forEach((x,i)=>{const og=grp[js[i]];x.keyFinal=og.keyFinal!=null?og.keyFinal:og.fifths;x.pieceTs=og.pieceTs||null;let ct=og.clefType;(og.clefCh||[]).forEach(cc=>{if(cc.x<x0+0.3*p)ct=cc.t;});if(ct)x.clefType=ct;});
-    const res=omrPolyItems([np],plan,st.clef,null,barTicks());
+    const res=omrPolyItems([np],plan,st.clef,null,barTicks());per.bad+=res.bad;
     for(let i=0;i<js.length;i++){
       const R=res.parts[np.staves[i].part];if(!R||!R.items.length)return null;
       let items=R.items,v2=R.v2||null;
@@ -2189,6 +2198,42 @@ async function rescanOne(k){
   }
   stt.next=0;stt.seen=new Set();return {none:true,readable};
 }
+// Careful scan: every bar that did not add up is read again in all the ways above. Of the readings that do add up,
+// the one most ways agree on is kept (the earliest way wins a tie). Bars that add up are left as they were read.
+async function carefulPass(){
+  const bad=(sc.badBars||[]).slice();
+  if(!bad.length||!sc.parts.every(p=>p.pb)||!scan.kind)return;
+  stopPlay();rsState.clear();rsState.owner=sc.parts[0];
+  const before=JSON.stringify(sc.parts.map(p=>({items:p.items,v2:p.v2||null}))),left=[],t0=performance.now();let fixed=0,n=0;
+  carefulPass.stop=false;rsRead.fast=true;let lastPg=-1;
+  for(const k of bad){
+    if(carefulPass.stop){left.push(k);continue;}
+    n++;let best=null;
+    try{
+      const G=rsGeom(k),sp=G&&(scan.pages[G.pg]||await readScanPage(G.pg)),grp=sp?sp.page.staves.filter(x=>x.sys===G.sys):[];
+      if(G&&G.pg!==lastPg){rsCache.forEach(freeCanvas);rsCache.clear();lastPg=G.pg;}   // (one page's pictures at a time)
+      if(grp.length){
+        const votes=new Map();
+        for(let mi=0;mi<RS_METHODS.length&&!carefulPass.stop;mi++){
+          const per1=(performance.now()-t0)/Math.max(1,(n-1)*RS_METHODS.length+mi),leftS=per1*((bad.length-n+1)*RS_METHODS.length-mi)/1000;
+          stat(`Careful scan: bar ${k+1} (${n} of ${bad.length} doubtful bars), way ${mi+1} of ${RS_METHODS.length}…`+(n>1||mi>1?` ${timeLeft(leftS)[0].toUpperCase()+timeLeft(leftS).slice(1)} left.`:'')+' Press Esc to stop.');await tick();
+          let per=null;try{per=await rsRead(k,RS_METHODS[mi],G,sp);}catch(e){console.error(e);}
+          if(!per||per.bad)continue;
+          const todo=rsPlan(k,grp,per);if(!todo)continue;
+          const sg=todo.map(t=>rsSig(t.N)+(t.P.v2||t.V?'|'+rsSig(t.V):'')).join(' / '),v=votes.get(sg)||{n:0,todo,mi};v.n++;votes.set(sg,v);
+        }
+        votes.forEach(v=>{if(!best||v.n>best.n)best=v;});
+      }
+    }catch(e){console.error(e);}
+    if(best){rsApply(k,best.todo);fixed++;}else left.push(k);
+  }
+  rsCache.forEach(freeCanvas);rsCache.clear();rsRead.fast=false;sc.badBars=left;
+  if(fixed){rsUndo.push(before);if(rsUndo.length>30)rsUndo.shift();$('rsUndo').style.display='';sc.sel=-1;sc.cur=sc.items.length;sc.parts.forEach(p=>{p.hist=[];});keepScroll(drawRecording);buildParts();}
+  stat(`Careful scan: ${fixed} of ${bad.length} doubtful bar${bad.length>1?'s':''} now add${fixed===1?'s':''} up`+(fixed?' (Undo re-scan under Edit puts the first reading back).':'.')+(left.length?` Still to check: bar${left.length>1?'s':''} ${left.map(x=>x+1).join(', ')}.`:''));
+}
+addEventListener('keydown',e=>{if(e.key==='Escape')carefulPass.stop=true;});
+try{$('scCareful').checked=localStorage.getItem('score-conv-careful')==='1';}catch(e){}
+$('scCareful').onchange=()=>{try{localStorage.setItem('score-conv-careful',$('scCareful').checked?'1':'0');}catch(e){}};
 async function rescanBars(b0,b1){
   if(!sc.parts.every(p=>p.pb)||!sc.parts[0].items.some(it=>/^\d+\.\d+$/.test(String(it.bar)))){stat('Only a score with a piano part or several voices, read from printed music, can be re-scanned bar by bar.');return;}
   if(!scan.kind||(sc.scanName&&scan.name!==sc.scanName)){stat('The printed pages are not open. Press Open score, choose '+(sc.scanName||'the same file')+' again, press Close on the page view, then re-scan.');return;}
