@@ -1090,7 +1090,9 @@ function omrReadPage(imgData, again) {
       else { barRep[k].start = barRep[k].start || !!b.start; barRep[k].end = barRep[k].end || !!b.end; } }
     // a thick bar line at the very end of the line closes a piece (unless it only ends a repeat)
     const lastBar = bars[bars.length - 1];
-    const endsFinal = !!lastBar && lastBar.x1 - lastBar.x0 + 1 >= 0.3 * p && lastBar.x1 >= st.right - 0.8 * p && !(barRep.length && barRep[barRep.length - 1].end);
+    // (two thin lines close together are a double bar line inside a piece, not its end: the end has one thick stroke)
+    let thickRun = 0; if (lastBar) { let run = 0, px = -9; for (const x of cols) { if (x < lastBar.x0 || x > lastBar.x1) continue; run = x === px + 1 ? run + 1 : 1; px = x; if (run > thickRun) thickRun = run; } }
+    const endsFinal = !!lastBar && lastBar.x1 - lastBar.x0 + 1 >= 0.3 * p && lastBar.x1 >= st.right - 0.8 * p && !(barRep.length && barRep[barRep.length - 1].end) && (!again || thickRun >= 0.28 * p);
 
     // ---------- a change of clef inside the line ----------
     const clefBoxes = []; st.clefCh = [];
