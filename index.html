@@ -61,6 +61,9 @@ span.pname{min-width:0;color:var(--dim)}
 #bmBar .bm .go{border-radius:6px 0 0 6px;border-right:0;background:#fef3c7;border-color:#f59e0b}
 #bmBar .bm .go:hover{background:#fde68a}
 #bmBar .bm .x{border-radius:0 6px 6px 0;padding:6px 8px;border-color:#f59e0b;color:#92400e}
+#bmBar .bm.on .go{background:#f59e0b;color:#fff;border-color:#d97706}
+#bmBar .bm.wait .go{border-style:dashed}
+body.bmpick #recscore,body.bmpick #recscore *{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='34' viewBox='0 0 24 24'%3E%3Cpath d='M12 6c-2-1.3-5-1.6-8-1v13c3-.6 6-.3 8 1 2-1.3 5-1.6 8-1V5c-3-.6-6-.3-8 1z' fill='%23fef3c7' stroke='%2392400e' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M12 6v13' stroke='%2392400e' stroke-width='1.5'/%3E%3C/svg%3E") 17 17,cell !important}
 /* tidying a photo before it is read */
 #tidy{position:fixed;inset:10px;z-index:35;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 40px rgba(15,23,42,.35);padding:12px;display:none;flex-direction:column;gap:8px}
 #tidy.open{display:flex}
@@ -101,7 +104,7 @@ span.pname{min-width:0;color:var(--dim)}
   <label>From <select id="fromSel" style="max-width:200px"></select></label>
   <label>Bar <input type="number" id="fromBar" min="1" placeholder="–" style="width:58px"></label>
   <button id="followBtn" class="on" title="Keep the music that is playing in view (scrolling by hand pauses it)">Follow</button>
-  <button id="bmBtn" title="Mark the bar that is playing now (or the bar of the selected note), to come back to it later. Key: M">+ Bookmark</button>
+  <button id="bmBtn" title="Press, then click the first bar and the last bar of the passage in the score. The bookmark appears above the score; press it to play the passage, and switch Loop on to go round it.">+ Bookmark</button>
   <button id="lpBtn" title="Play the bars chosen here round and round, for practising">Loop</button>
   <label title="The bars to play round and round">bars <input type="number" id="lpFrom" min="1" placeholder="–" style="width:56px"> to <input type="number" id="lpTo" min="1" placeholder="–" style="width:56px"></label>
   <label title="Clicks before the music starts, and before each time round a loop">Count-in <select id="cntSel"><option value="0">none</option><option value="1">1 bar</option><option value="2">2 bars</option></select></label>
@@ -219,7 +222,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.8';
+const APP_VERSION='5.9';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -818,7 +821,7 @@ function guessViol(name,clef,sound){
   return sound==='violin'?'treble':sound==='cello'?'bass':'tenor';
 }
 const violOf=p=>p&&VIOLS[p.viol]?p.viol:'tenor';
-const sc={ts:[4,4],bpm:60,sel:-1,cur:0,bi:3,dots:0,parts:[newPart('Part 1','treble','piano',0)],pi:0,reverb:0.3,full:false,neckPart:0,tr:0,bm:[]};   // tr: semitones the sound is above the written notes   // neckPart: the part the neck shows while playing (-1: every part)
+const sc={ts:[4,4],bpm:60,sel:-1,cur:0,bi:3,dots:0,parts:[newPart('Part 1','treble','piano',0)],pi:0,reverb:0.3,full:false,neckPart:0,tr:0,bm:[],bmSel:-1};   // tr: semitones the sound is above the written notes   // neckPart: the part the neck shows while playing (-1: every part)
 try{sc.full=localStorage.getItem('score-conv-full')==='1';}catch(e){}   // all the parts' staves together (remembered)
 Object.defineProperty(sc,'items',{get(){return sc.parts[sc.pi].items;},set(v){sc.parts[sc.pi].items=v;}});
 Object.defineProperty(sc,'hist',{get(){return sc.parts[sc.pi].hist;},set(v){sc.parts[sc.pi].hist=v;}});
@@ -891,7 +894,7 @@ function lightNeck(m){
 // Dragging a note up or down on the staff moves it line by line, space by space, in the key (a chord moves as a whole).
 let nDrag=null,nDragJust=0;
 function startNoteDrag(ev,pi,idx){
-  if(ev.button||idx<0||playing)return;const it=sc.parts[pi]&&sc.parts[pi].items[idx];if(!it||it.m==null)return;
+  if(ev.button||idx<0||playing||bmPick)return;const it=sc.parts[pi]&&sc.parts[pi].items[idx];if(!it||it.m==null)return;
   const svg=ev.target.closest('svg');if(!svg)return;const r=svg.getBoundingClientRect(),vb=svg.viewBox&&svg.viewBox.baseVal,k=vb&&vb.width?r.width/vb.width:1;
   nDrag={pi,idx,y:ev.clientY,step:5*k,base:it.m,ch:it.ch?it.ch.slice():null,moved:0,snapped:false};
 }
@@ -1099,6 +1102,7 @@ function addArts(ps,notes){ps.forEach((p,i)=>{const sn=notes[i];if(!p.art||!sn||
   p.art.forEach(a=>{if(!ARTV[a])return;try{sn.addModifier(new Articulation(ARTV[a]).setPosition(a==='fe'?3:(sn.getStemDirection()>0?4:3)),0);}catch(e){}});});}
 // dynamics under the staff (over it for a voice part, whose words go underneath)
 const hasWords=()=>sc.parts.some(p=>p.items.some(i=>i.ly));
+const barBoxes=[];   // {svg, x, w, k}: bar number k (from 0) of the score, as drawn
 // room under each staff for the words: one row for each verse
 const lyRoom=()=>{let n=0;sc.parts.forEach(p=>p.items.forEach(i=>{if(i.ly){const c=i.ly.split('\n').length;if(c>n)n=c;}}));return n?6+n*17:0;};
 function fitLyrics(){
@@ -1193,7 +1197,7 @@ function drawTies(list,sysCtx){
     }catch(e){}
   });
 }
-function drawRecording(){drawRecording0();try{fitLyrics();}catch(e){}}
+function drawRecording(){barBoxes.length=0;drawRecording0();try{fitLyrics();}catch(e){}try{bmPaint();}catch(e){}}
 function drawRecording0(){
   scoreVer++;
   // hold the score's height while it is rebuilt, so the page never gets shorter for a moment and jumps
@@ -1235,7 +1239,7 @@ function drawScore(el){
     let x=5,firstStave=null;
     sys.units.forEach(({b:bar,bw},bi)=>{
       const isFirst=bi===0,width=bw*scale+extra[bi],next=bars[gb+1];
-      const stave=new Stave(x,50+hd,width);if(isFirst)firstStave=stave;
+      const stave=new Stave(x,50+hd,width);if(isFirst)firstStave=stave;barBoxes.push({svg,x,w:width,k:gb});
       const clef=barClef(bar),vfClef=clef==='treble8'?'treble':clef,shift=clef==='treble8'?1:0,restKey=REST_KEY[clef]||'b/4';
       const prevBar=gb>0?bars[gb-1]:null,clefChange=!isFirst&&prevBar&&barClef(prevBar)!==clef;
       if(clefChange)stave.addClef(clef==='treble8'?'treble':clef,'small');
@@ -1358,7 +1362,7 @@ function drawFullScore(el){
     const scale=lineScale(sys,bodyAvail/sum);
     let x=5+nameW,firstStave=null;
     sys.units.forEach(({ci,bw},bi)=>{
-      const c=cols[ci],bar=c.bar,isFirst=bi===0,next=cols[ci+1],prev=ci>0?cols[ci-1]:null,width=bw*scale+extra[bi];
+      const c=cols[ci],bar=c.bar,isFirst=bi===0,next=cols[ci+1],prev=ci>0?cols[ci-1]:null,width=bw*scale+extra[bi];barBoxes.push({svg,x,w:width,k:ci});
       const clefs=sc.parts.map((pt,pi)=>clefOf(pt,c.clefs[pi]));
       const staves=sc.parts.map((pt,pi)=>{
         const stave=new Stave(x,50+hd+pi*gapY,width),clef=clefs[pi];
@@ -1614,9 +1618,9 @@ function playScore(){
   const master=audioOut(),c=ac,out=c.createGain();out.connect(master);
   const buses=sc.parts.map(p=>{const g=c.createGain(),pan=c.createStereoPanner();g.gain.value=audible(p)?p.vol:0;pan.pan.value=p.pan;g.connect(pan).connect(out);return {g,pan};});
   const go=sc.bmGo;sc.bmGo=null;
-  const L=go!=null?null:loopRange(),from=L?L.t0:go!=null?go:startTick();
+  const L=go!=null?null:loopRange(),from=L?L.t0:go!=null?go.t0:startTick();
   const tl=buildTimeline(from),per=60/sc.bpm/TPQ,t0=c.currentTime+0.15;
-  if(L){const len=L.t1-L.t0;tl.ev=tl.ev.filter(e=>e.at<len-0.01);tl.ev.forEach(e=>{if(e.at+e.d>len)e.d=len-e.at;});tl.total=len;}
+  if(L||(go&&go.t1!=null)){const len=L?L.t1-L.t0:go.t1-go.t0;tl.ev=tl.ev.filter(e=>e.at<len-0.01);tl.ev.forEach(e=>{if(e.at+e.d>len)e.d=len-e.at;});tl.total=len;}
   const cb=+$('cntSel').value||0,CB=countBeats(),cT=cb*CB.n*CB.len;
   if(cT){tl.ev.forEach(e=>{e.at+=cT;});const cl=[];for(let i=0;i<cb*CB.n;i++)cl.push({click:i%CB.n===0?2:1,at:i*CB.len,x:true});tl.ev=cl.concat(tl.ev);tl.total+=cT;}
   adviceStart();
@@ -2305,7 +2309,7 @@ async function loadFile(f){
     if(n.endsWith('.json')){
       const d=JSON.parse(await f.text());
       if(d.app!=='tenor-viol-trainer'&&d.app!=='score-converter')throw new Error('not a Score Converter file');
-      sc.tr=Math.max(-24,Math.min(24,d.tr|0));sc.bm=Array.isArray(d.bm)?d.bm.filter(k=>Number.isInteger(k)&&k>=0).slice(0,60):[];sc.trS=d.trS|0;sc.scanName=typeof d.src==='string'?d.src.slice(0,200):'';   // (the files still say tenor-viol-trainer inside, as before)
+      sc.tr=Math.max(-24,Math.min(24,d.tr|0));sc.bm=Array.isArray(d.bm)?d.bm.map(x=>Array.isArray(x)?{a:x[0]|0,b:x[1]==null?null:x[1]|0}:{a:x|0,b:null}).filter(x=>x.a>=0).slice(0,60):[];sc.bmSel=-1;sc.trS=d.trS|0;sc.scanName=typeof d.src==='string'?d.src.slice(0,200):'';   // (the files still say tenor-viol-trainer inside, as before)
       let items;
       const okItem=i=>i&&typeof i.d==='number'&&(i.m==null||typeof i.m==='number');
       if(Array.isArray(d.parts)&&d.parts.length){   // a score with parts
@@ -2362,41 +2366,86 @@ $('wipeBtn').onclick=()=>{   // always on screen: wipes any exercise, test or pi
   const n=sc.parts.length;
   if(confirm(n>1?`Delete the whole score, all ${n} parts? This cannot be undone.`:'Delete everything in the score? (Undo brings it back.)'))clearScore();};
 $('playBtn').onclick=playScore;
-// Bookmarks: a bar marked while the music plays (or the bar of the selected note). Pressing one plays from that bar.
-function bmNow(){
-  const map=barMap();if(!map.length)return -1;
-  let i=playing?playing.lit[sc.pi]:null;if(i==null&&sc.sel>=0)i=sc.sel;if(i==null)return playing?-1:0;
-  let k=0;map.forEach((b,j)=>{if(b.idx<=i)k=j;});return k;
+// Bookmarks: a passage of the score, from one bar to another. Press + Bookmark, click the first bar, click the last bar:
+// the bookmark appears above the score. Pressing it plays the passage; with Loop on it goes round and round.
+let bmPick=0,bmFirst=-1;   // picking: 0 no, 1 the first bar is wanted, 2 the last
+function bmPickSet(n){bmPick=n;document.body.classList.toggle('bmpick',n>0);$('bmBtn').classList.toggle('on',n>0);$('bmBtn').textContent=n?'Cancel bookmark':'+ Bookmark';}
+function barAt(e){
+  const svg=e.target&&e.target.closest&&e.target.closest('svg');if(!svg)return -1;
+  const r=svg.getBoundingClientRect(),vb=svg.viewBox&&svg.viewBox.baseVal,x=(e.clientX-r.left)*(vb&&vb.width?vb.width/r.width:1);let best=-1,d=1e9;
+  barBoxes.forEach(q=>{if(q.svg!==svg)return;const dd=x<q.x?q.x-x:x>q.x+q.w?x-q.x-q.w:0;if(dd<d){d=dd;best=q.k;}});
+  return best;
 }
+const bmName=(q,map,pieces)=>{const A=map[q.a],B=q.b!=null?map[q.b]:null,pre=pieces>1&&A?A.piece+': ':'';if(!A)return '?';return pre+(B==null?'From bar '+A.bar:B.bar===A.bar?'Bar '+A.bar:'Bars '+A.bar+' to '+B.bar);};
 function bmShow(){
-  const B=$('bmBar'),map=barMap(),pieces=map.filter(b=>b.kind==='piece').length;B.innerHTML='';sc.bm=(sc.bm||[]).filter(k=>k<map.length);
-  sc.bm.forEach(k=>{const b=map[k],w=document.createElement('span');w.className='bm';
-    const g=document.createElement('button');g.className='go';g.textContent='▶ '+(pieces>1?b.piece+': ':'')+'Bar '+b.bar;g.title='Play from this bookmark';g.onclick=()=>bmGo(k);
-    const x=document.createElement('button');x.className='x';x.textContent='×';x.title='Remove this bookmark';x.onclick=()=>{sc.bm=sc.bm.filter(q=>q!==k);bmShow();};
+  const B=$('bmBar'),map=barMap(),pieces=map.filter(x=>x.kind==='piece').length;B.innerHTML='';
+  sc.bm=(sc.bm||[]).filter(q=>q.a<map.length).map(q=>({a:q.a,b:q.b!=null?Math.min(q.b,map.length-1):null}));if(!(sc.bmSel<sc.bm.length))sc.bmSel=-1;
+  sc.bm.forEach((q,i)=>{const w=document.createElement('span');w.className='bm'+(i===sc.bmSel?' on':'');
+    const g=document.createElement('button');g.className='go';g.textContent='▶ '+bmName(q,map,pieces);g.title='Play this passage (with Loop on: round and round)';g.onclick=()=>bmGo(i);
+    const x=document.createElement('button');x.className='x';x.textContent='×';x.title='Remove this bookmark';x.onclick=()=>{sc.bm.splice(i,1);if(sc.bmSel===i)sc.bmSel=-1;else if(sc.bmSel>i)sc.bmSel--;bmShow();bmPaint();};
     w.append(g,x);B.append(w);});
-  B.classList.toggle('has',sc.bm.length>0);
+  if(bmPick===2&&map[bmFirst]){const w=document.createElement('span');w.className='bm wait';const g=document.createElement('button');g.className='go';g.textContent='Bar '+map[bmFirst].bar+' to … (click the last bar)';w.append(g);B.append(w);}
+  B.classList.toggle('has',B.children.length>0);
 }
-function bmAdd(){
-  if(!sc.parts.some(p=>p.items.length)){stat('Open a score first.');return;}
-  const k=bmNow();if(k<0){stat('Nothing has played yet: press the bookmark once the music has started.');return;}
-  const b=barMap()[k];if(sc.bm.includes(k)){stat(`Bar ${b.bar} already has a bookmark.`);return;}
+// the bars of the chosen bookmark (and the first bar while the second is being picked) are shaded in the score
+function bmPaint(){
+  document.querySelectorAll('#recscore rect.bmshade').forEach(x=>x.remove());
+  let a=-1,b=-1;if(bmPick===2){a=b=bmFirst;}else{const q=sc.bm&&sc.bm[sc.bmSel];if(q&&q.b!=null){a=q.a;b=q.b;}}
+  if(a<0)return;
+  barBoxes.forEach(q=>{if(q.k<a||q.k>b)return;const vb=q.svg.viewBox.baseVal,r=document.createElementNS(SVGNS,'rect');
+    r.setAttribute('x',q.x.toFixed(1));r.setAttribute('y','6');r.setAttribute('width',q.w.toFixed(1));r.setAttribute('height',Math.max(10,vb.height-12).toFixed(1));
+    r.setAttribute('fill','#fde68a');r.setAttribute('opacity','0.45');r.setAttribute('class','bmshade');r.style.pointerEvents='none';q.svg.insertBefore(r,q.svg.firstChild);});
+}
+// the loop boxes take the bars of a bookmark
+function bmToLoop(q){const map=barMap(),A=map[q.a],B=q.b!=null?map[q.b]:null;if(!A)return;
+  if(map.filter(x=>x.kind==='piece').length>1){const pi=map.findIndex(x=>x.kind==='piece'&&x.piece===A.piece),o=[...$('fromSel').options].find(o=>o.value===String(pi));$('fromSel').value=o?o.value:'start';}
+  $('lpFrom').value=A.bar;$('lpTo').value=B?B.bar:'';}
+function bmAddRange(a,b){
   if(sc.bm.length>=60){stat('That is a lot of bookmarks: remove one first.');return;}
-  sc.bm.push(k);sc.bm.sort((x,y)=>x-y);bmShow();stat(`Bookmark at bar ${b.bar}. Press it (above the score) to play from there.`);
+  let i=sc.bm.findIndex(q=>q.a===a&&q.b===b);if(i<0){sc.bm.push({a,b});sc.bm.sort((x,y)=>x.a-y.a||(x.b==null?1e9:x.b)-(y.b==null?1e9:y.b));i=sc.bm.findIndex(q=>q.a===a&&q.b===b);}
+  sc.bmSel=i;bmToLoop(sc.bm[i]);bmShow();bmPaint();
+  const map=barMap(),nm=bmName(sc.bm[i],map,1).replace(/^B/,'b').replace(/^F/,'f');
+  stat(`Bookmark: ${nm}. Press it (above the score) to play it. Press Loop to go round it, with the count-in you choose.`);
 }
-function bmGo(k){
-  const map=barMap(),b=map[k];if(!b)return;
+// (key M while the music plays: a bookmark from the bar that is playing)
+function bmMarkNow(){
+  if(!playing){$('bmBtn').click();return;}
+  const map=barMap(),i=playing.lit[sc.pi];if(i==null||!map.length){stat('Nothing has played yet.');return;}
+  let k=0;map.forEach((q,j)=>{if(q.idx<=i)k=j;});bmAddRange(k,null);
+}
+function bmGo(i){
+  const q=sc.bm[i],map=barMap();if(!q||!map[q.a])return;
+  if(bmPick)bmPickSet(0);
   if(playing)stopPlay();if(sc.sel>=0){const old=sc.sel;sc.sel=-1;paintNote(old,null);}
-  const T=partTimes(leadPart())[sc.pi];sc.bmGo=T[b.idx]!=null?T[b.idx]:0;
-  const e=(noteEls.get(b.idx)||[])[0];if(e)(e.closest('svg')||e).scrollIntoView({block:'nearest'});
-  playScore();stat(`Playing from the bookmark at bar ${b.bar}.`);
+  sc.bmSel=i;bmToLoop(q);bmShow();bmPaint();
+  const e=(noteEls.get(map[q.a].idx)||[])[0];if(e)(e.closest('svg')||e).scrollIntoView({block:'nearest'});
+  if(lp.on&&q.b!=null){playScore();return;}   // (Loop is on: round and round, by the loop boxes just filled in)
+  const T=partTimes(leadPart())[sc.pi],at=j=>T[j]!=null?T[j]:0,nx=q.b!=null?map[q.b+1]:null;
+  const end=sc.items.length?at(sc.items.length-1)+sc.items[sc.items.length-1].d:0;
+  sc.bmGo={t0:at(map[q.a].idx),t1:q.b!=null?(nx?at(nx.idx):end):null};
+  playScore();stat(`Playing ${bmName(q,map,1).replace(/^B/,'b').replace(/^F/,'f')}.`+(q.b!=null?' Press Loop to go round it.':''));
 }
-$('bmBtn').onclick=bmAdd;
-$('lpBtn').onclick=()=>{lp.on=!lp.on;$('lpBtn').classList.toggle('on',lp.on);const was=playing;if(was)stopPlay();
-  if(lp.on){if($('cntSel').value==='0')$('cntSel').value='1';
-    if(!$('lpFrom').value){const bn=sc.sel>=0?barNoOf(sc.sel):0,map=barMap(),hit=sc.sel>=0&&map.filter(x=>x.idx<=sc.sel).pop();const b=hit?hit.bar:(bn||1);$('lpFrom').value=b;if(!$('lpTo').value)$('lpTo').value=b;}
-    stat('Loop is on: Play goes round the bars in the two boxes, with a count-in before each time. Change the boxes and press Play.');}
-  else stat('Loop is off.');
-  if(was)playScore();};
+$('bmBtn').onclick=()=>{
+  if(bmPick){bmPickSet(0);bmShow();bmPaint();stat('No bookmark made.');return;}
+  if(!sc.parts.some(p=>p.items.length)){stat('Open a score first.');return;}
+  bmFirst=-1;bmPickSet(1);stat('Bookmark: click the bar where the passage starts.');
+};
+$('recscore').addEventListener('click',e=>{
+  if(!bmPick)return;e.stopPropagation();e.preventDefault();
+  const k=barAt(e),map=barMap();if(k<0||!map[k]){stat('Click inside a bar of the score.');return;}
+  if(bmPick===1){bmFirst=k;bmPickSet(2);bmShow();bmPaint();stat(`It starts at bar ${map[k].bar}. Now click the bar where it ends (the same bar again for just that bar).`);return;}
+  const a=Math.min(bmFirst,k),b=Math.max(bmFirst,k);bmPickSet(0);bmAddRange(a,b);
+},true);
+addEventListener('keydown',e=>{if(e.key==='Escape'&&bmPick){bmPickSet(0);bmShow();bmPaint();stat('No bookmark made.');}});
+// Loop: on, it starts going round the bars of the loop boxes (a bookmark fills them in); off, it stops.
+$('lpBtn').onclick=()=>{lp.on=!lp.on;$('lpBtn').classList.toggle('on',lp.on);if(playing)stopPlay();
+  if(!lp.on){stat('Loop is off.');return;}
+  if($('cntSel').value==='0')$('cntSel').value='1';
+  const q=sc.bm&&sc.bm[sc.bmSel];if(q&&q.b!=null)bmToLoop(q);
+  if(!$('lpFrom').value){const map=barMap(),hit=sc.sel>=0&&map.filter(x=>x.idx<=sc.sel).pop();const bb=hit?hit.bar:1;$('lpFrom').value=bb;if(!$('lpTo').value)$('lpTo').value=bb;}
+  if(!sc.parts.some(p=>p.items.length)){stat('Loop is on. Open a score to use it.');return;}
+  playScore();};
+$('cntSel').onchange=()=>{if(playing){stopPlay();playScore();}};
 ['lpFrom','lpTo'].forEach(id=>{$(id).onkeydown=e=>{e.stopPropagation();if(e.key==='Enter'){if(playing)stopPlay();if(!lp.on)$('lpBtn').click();playScore();}};$(id).onchange=()=>{if(playing&&lp.on){stopPlay();playScore();}};});
 // Transposing. The score: every note and every key signature moves. The sound: what is played (and written into a MIDI
 // file) is so many semitones above or below the written notes, like a transposing instrument.
@@ -2512,7 +2561,7 @@ $('pdfClose').onclick=()=>{if(!scan.added&&scan.kind){$('scAll').click();return;
 $('scCancel').onclick=()=>{if($('pdfref').classList.contains('busy')){scan.stop=true;scanInfo('Stopping after this page…');return;}$('pdfref').classList.remove('open');if(!scan.added)stat('Nothing was scanned. Printed pages (top left) opens the print again.');};
 $('pagesBtn').onclick=async()=>{if(!scan.kind)return;stopPlay();$('pdfref').classList.add('open');scanStep();await showScanPage(scan.cur);};
 // the whole score, as saved in a .json file (and kept on this device)
-const scoreData=()=>({app:'score-converter',bm:(sc.bm||[]).slice(),tr:sc.tr||0,trS:sc.trS||0,src:sc.scanName||'',version:3,title:$('title').value,key:st.key,clef:st.clef,bpm:sc.bpm,ts:sc.ts,reverb:sc.reverb,part:sc.pi,neckPart:sc.neckPart,
+const scoreData=()=>({app:'score-converter',bm:(sc.bm||[]).map(x=>[x.a,x.b]),tr:sc.tr||0,trS:sc.trS||0,src:sc.scanName||'',version:3,title:$('title').value,key:st.key,clef:st.clef,bpm:sc.bpm,ts:sc.ts,reverb:sc.reverb,part:sc.pi,neckPart:sc.neckPart,
   parts:sc.parts.map(p=>({name:p.name,clef:p.clef,mainClef:p.mainClef||null,kb:p.kb||null,pb:!!p.pb,v2:p.v2||null,sound:p.sound,viol:violOf(p),vol:p.vol,pan:p.pan,mute:p.mute,solo:p.solo,items:p.items}))});
 $('expBtn').onclick=()=>{
   if(rec.on)stopRec();
@@ -2605,7 +2654,7 @@ addEventListener('keydown',e=>{
   else if(e.key>='1'&&e.key<='6')setDur(+e.key-1);
   else if(e.key==='.')setDots((sc.dots+1)%3);
   else if(e.key==='r'||e.key==='R')addItem(null);
-  else if(e.key==='m'||e.key==='M')bmAdd();
+  else if(e.key==='m'||e.key==='M')bmMarkNow();
   else if(/^[a-gA-G]$/.test(e.key))addLetter(e.key.toUpperCase());
   else if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();delNote();}
 });
