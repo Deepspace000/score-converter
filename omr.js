@@ -736,6 +736,55 @@ function analyzeBitmap(imgData, opts){
   real.sort((a, b) => b.area - a.area);
   const kept = [];
   for (const n of real) { if (!kept.some(k => Math.hypot(k.x - n.x, k.y - n.y) < 0.5 * n.p)) kept.push(n); }
+  // Small notes: a second voice printed small under or over the main one. Their heads are too small for the search
+  // above. A small solid oval on a line or in a space counts when it has a stem of its own: on its right going up,
+  // or on its left going down. (A flat has its stroke on the left going up; a sharp's strokes go both ways; a flag's
+  // thick end hangs on a stem that leads to a full-sized head.)
+  if (opts.thickLedger) {
+    const mh = 0.62 * minH, mv = 0.62 * minV, seen2 = new Uint8Array(N), small = [];
+    const c2 = k => filled[k] && hRun[k] >= mh && vRun[k] >= mv;
+    const vrun = (x, y, dir, max) => { let n = 0; for (let yy = y + dir; yy >= 0 && yy < H && n < max && filled[yy * W + x]; yy += dir) n++; return n; };
+    for (const [ya, yb] of ranges) for (let y = ya; y <= yb; y++) for (let x = 0; x < W; x++) {
+      const idx = y * W + x; if (seen2[idx] || !c2(idx)) continue;
+      let sp = 0; stack[sp++] = idx; seen2[idx] = 1;
+      let area = 0, sx = 0, sy = 0, minx = x, maxx = x, miny = y, maxy = y;
+      while (sp > 0) {
+        const q = stack[--sp], px = q % W, py = (q - px) / W; area++; sx += px; sy += py;
+        if (px < minx) minx = px; if (px > maxx) maxx = px; if (py < miny) miny = py; if (py > maxy) maxy = py;
+        if (px > 0 && !seen2[q - 1] && c2(q - 1)) { seen2[q - 1] = 1; stack[sp++] = q - 1; }
+        if (px < W - 1 && !seen2[q + 1] && c2(q + 1)) { seen2[q + 1] = 1; stack[sp++] = q + 1; }
+        if (py > ya && !seen2[q - W] && c2(q - W)) { seen2[q - W] = 1; stack[sp++] = q - W; }
+        if (py < yb && !seen2[q + W] && c2(q + W)) { seen2[q + W] = 1; stack[sp++] = q + W; }
+      }
+      const w = maxx - minx + 1, h = maxy - miny + 1, cx = sx / area, cy = sy / area;
+      let st = null, bd = 1e9; for (const s of staves) { const dd = Math.abs(cy - (s.top + s.bot) / 2); if (dd < bd) { bd = dd; st = s; } }
+      if (!st) continue; const p = st.p;
+      if (w < 0.4 * p || w > 0.85 * p || h < 0.35 * p || h > 0.75 * p || area < 0.6 * w * h) continue;
+      if (cx < (st.musicStart || st.left + 3.2 * p) + 0.3 * p || cx > st.right) continue;
+      const raw = (cy - st.top) / (p / 2), step = Math.round(raw);
+      if (Math.abs(raw - step) > 0.35 || step < -3 || step > 13) continue;
+      if (kept.some(k => Math.hypot(k.x - cx, k.y - cy) < 0.95 * p)) continue;
+      // solid in the middle, and not a filled-in hollow (the round part of a flat, the middle of a sharp)
+      { const rx = 0.28 * p, ry = 0.22 * p; let n = 0, c = 0, ho = 0;
+        for (let yy = Math.round(cy - ry); yy <= Math.round(cy + ry); yy++) { const dy = (yy - cy) / ry, half = rx * Math.sqrt(Math.max(0, 1 - dy * dy)); for (let xx = Math.round(cx - half); xx <= Math.round(cx + half); xx++) { if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue; n++; c += filled[yy * W + xx]; ho += holes[yy * W + xx]; } }
+        if (!n || c / n < 0.93 || ho > 0.05 * n) continue; }
+      // nothing thick runs on sideways from it (a beam, a word)
+      { const yy = Math.round(cy); let l = Math.round(cx), r = l; while (l > 0 && filled[yy * W + l - 1]) l--; while (r < W - 1 && filled[yy * W + r + 1]) r++; if (r - l + 1 > 1.35 * p) continue; }
+      // its stem: thin, long, going one way only
+      const y0 = Math.round(cy); let stem = null;
+      for (let xx = Math.round(maxx - 0.2 * p); xx <= Math.round(maxx + 0.3 * p) && !stem; xx++) { if (xx < 0 || xx >= W || !filled[y0 * W + xx]) continue; const up = vrun(xx, y0, -1, 9 * p), dn = vrun(xx, y0, 1, 9 * p); if (up >= 0.8 * p && up + dn >= 1.5 * p) stem = { x: xx, tipY: y0 - up, up: true }; }
+      for (let xx = Math.round(minx - 0.3 * p); xx <= Math.round(minx + 0.2 * p) && !stem; xx++) { if (xx < 0 || xx >= W || !filled[y0 * W + xx]) continue; const dn = vrun(xx, y0, 1, 9 * p), up = vrun(xx, y0, -1, 9 * p); if (dn >= 0.8 * p && up + dn >= 1.5 * p) stem = { x: xx, tipY: y0 + dn, up: false }; }
+      if (!stem) continue;
+      { let thin = 0;   // (thin along most of its length: another small head of the same chord may sit on it. The zigzag of a crotchet rest, whose hook looks like a small head, is thick for much of its length.)
+        for (const f of [0.3, 0.5, 0.7, 0.85]) { const ym = Math.round(y0 + f * (stem.tipY - y0)); let l = stem.x, r = stem.x; while (l > 0 && filled[ym * W + l - 1]) l--; while (r < W - 1 && filled[ym * W + r + 1]) r++; if (r - l + 1 <= 0.3 * p) thin++; }
+        if (thin < 3) continue; }
+      if (kept.some(k => Math.abs(k.x - stem.x) < 1.0 * p && Math.abs(k.y - stem.tipY) < 0.9 * p)) continue;   // (a flag: its stem leads to a full-sized head)
+      small.push({ x: cx, y: st.top + step * p / 2, step, p, stemUp: stem.up, staff: staves.indexOf(st), area, w, small: true, sx: stem.x, tipY: stem.tipY });
+    }
+    // (the thick end of a small note's own flag: its "stem" leads down to a small head that has its stem going up)
+    for (let i = small.length - 1; i >= 0; i--) { const f = small[i]; if (!f.stemUp && small.some(h => h !== f && h.stemUp && Math.abs(h.sx - f.sx) <= 3 && Math.abs(h.y - f.tipY) < 0.9 * f.p)) small.splice(i, 1); }
+    for (const n of small) if (!kept.some(k => Math.hypot(k.x - n.x, k.y - n.y) < 0.5 * n.p)) kept.push(n);
+  }
   kept.sort((a, b) => a.staff - b.staff || a.x - b.x);
   const out = { W, H, LT, U, staves, notes: kept, bin, clean, filled, holes };
   if (opts.debug) Object.assign(out, { core, blobs, rej, accidentals: notes.filter(n => accidental(n)) });
@@ -1013,17 +1062,22 @@ function omrReadPage(imgData, again) {
         // (a stem touches its head: a sharp, flat or natural beside the head has upright strokes too, but stands apart)
         const yo = Math.round(o.n.y), touches = x => { let gap = 0; const x2 = Math.round(o.n.x); for (let xx = Math.min(x, x2); xx <= Math.max(x, x2); xx++) { if (filled[yo * W + xx] || filled[(yo - 2) * W + xx] || filled[(yo + 2) * W + xx]) gap = 0; else if (++gap > 2) return false; } return true; };
         for (let x = xa; x <= xb; x++) { const len = runLen(x, yo, dir, (again ? 9 : 7) * p); if (len > best.len && (!again || touches(x))) best = { len, x, dir }; }   // (stems to a far beam are long in piano music)
-        best.has = best.len - 0.4 * p >= 1.6 * p; return best;
+        best.has = best.len - 0.4 * p >= (o.n.small ? 0.8 : 1.6) * p; return best;   // (a small note has a short stem)
       };
       const make = (hs, s) => {
         const has = !!(s && s.has), breve = hs.some(h => h.n.breve), hollow = hs.filter(h => h.hollow).length * 2 > hs.length;
         let bands = 0;
         if (has && !hollow && !breve) {
-          const o = s.dir < 0 ? hs[0] : hs[hs.length - 1], tip = o.n.y + s.dir * s.len, to = tip - s.dir * Math.min(2.5 * p, Math.max(1.7 * p, s.len - 1.0 * p));
+          const o = s.dir < 0 ? hs[0] : hs[hs.length - 1], tip = o.n.y + s.dir * s.len, sm = !!o.n.small, pb = sm ? 0.72 * p : p;
+          const to = tip - s.dir * Math.min(2.5 * p, sm ? Math.max(0.5 * p, s.len - 0.9 * p) : Math.max(1.7 * p, s.len - 1.0 * p));
           // (a slanted beam lies a little past the stem's end on one side of the stem)
           const tipX = again ? tip + s.dir * 0.9 * p : tip;
-          const beam = [1, -1].map(sg => Math.max(med3([0.35, 0.55, 0.75].map(dx => bandCount(s.x + sg * dx * p, tipX, to, p, s.x, sg < 0, tip))), med3([0.9, 1.25, 1.6].map(dx => bandCount(s.x + sg * dx * p, tipX, to, p, s.x, true, tip)))));
-          const flag = med3([0.4, 0.6, 0.8].map(dx => bandCount(s.x + dx * p, tip, to, p, s.x)));
+          const beam = [1, -1].map(sg => Math.max(med3([0.35, 0.55, 0.75].map(dx => bandCount(s.x + sg * dx * p, tipX, to, pb, s.x, sg < 0, tip))), med3([0.9, 1.25, 1.6].map(dx => bandCount(s.x + sg * dx * p, tipX, to, pb, s.x, true, tip)))));
+          // (a flag joins the stem at its top and then curls away from it: further out it need not reach back to the
+          //  stem, as long as it does so close to the stem)
+          const fj = [0.4, 0.6, 0.8].map(dx => bandCount(s.x + dx * pb, tip, to, pb, s.x)), fr = [0.4, 0.6, 0.8].map(dx => bandCount(s.x + dx * pb, tip, to, pb));
+          const ft = again ? bandCount(s.x + 0.4 * pb, tip, to, pb, s.x, true) : 0;   // (thick where it joins the stem: a slur that starts at the stem's end is thin)
+          const flag = Math.max(med3(fj.slice()), ft >= 1 ? Math.min(ft, med3(fr)) : 0);
           bands = Math.max(beam[0], beam[1], flag);
         }
         let d = breve ? 128 : !has ? (hollow ? 64 : 16) : hollow ? 32 : bands >= 3 ? 2 : bands === 2 ? 4 : bands === 1 ? 8 : 16;
@@ -1032,7 +1086,7 @@ function omrReadPage(imgData, again) {
         hs.forEach(h => { if (!h.acc && !h.n.breve && hs.length === 1) h.acc = accLeft(h.n, p); });
         const xs = hs.map(h => h.n.x);
         pe.push({ kind: 'note', x: has && s.dir > 0 ? Math.max(...xs) : Math.min(...xs), y: hs[0].n.y, d, dotted, up: has ? s.dir < 0 : null, hollow, bands,
-          notes: hs.map(h => ({ x: h.n.x, y: h.n.y, step: h.n.step, half: h.n.breve ? h.n.w / 2 : 0.6 * p, accOff: h.acc ? h.acc.type : null, accBox: h.acc })) });
+          notes: hs.map(h => ({ x: h.n.x, y: h.n.y, step: h.n.step, half: h.n.breve ? h.n.w / 2 : 0.6 * p, accOff: h.acc ? h.acc.type : null, accBox: h.acc, small: !!h.n.small })) });
       };
       for (let hs of cols) {
         hs.sort((a, b) => a.n.y - b.n.y);
@@ -1137,7 +1191,11 @@ function omrReadPage(imgData, again) {
       if (!ok) continue;
       let up = 0; while (up < Math.max(1.2 * p, upGap + 1) && spanTop - 1 - up >= 0 && bin[(spanTop - 1 - up) * W + x]) up++;
       let dn = 0; while (dn < Math.max(1.2 * p, dnGap + 1) && spanBot + 1 + dn < H && bin[(spanBot + 1 + dn) * W + x]) dn++;
-      const upOk = up <= 0.55 * p || (prevS && up >= upGap), dnOk = dn <= 0.55 * p || (nextS && dn >= dnGap);
+      let upOk = up <= 0.55 * p || (prevS && up >= upGap), dnOk = dn <= 0.55 * p || (nextS && dn >= dnGap);
+      // (a bar line between two staves can be broken where words are printed over it: it leaves this staff, stops,
+      //  and arrives at the other staff in the same place)
+      if (again && !dnOk && nextS && dn >= 0.2 * dnGap) { let o = 0; const y0 = Math.round(nextS.top) - 1; while (o < dnGap && bin[(y0 - o) * W + x]) o++; if (o >= 0.2 * dnGap && dn + o >= 0.55 * dnGap) dnOk = true; }
+      if (again && !upOk && prevS && up >= 0.2 * upGap) { let o = 0; const y0 = Math.round(prevS.bot) + 1; while (o < upGap && bin[(y0 + o) * W + x]) o++; if (o >= 0.2 * upGap && up + o >= 0.55 * upGap) upOk = true; }
       if (upOk && dnOk && !mine.some(n => Math.abs(n.x - x) <= 0.85 * p)) cols.push(x);   // a stem right beside a notehead is not a bar line
     }
     const bars = [];
@@ -1292,7 +1350,7 @@ function omrReadPage(imgData, again) {
       else if (!nx) e.tie = arc(e.x + e.half + 0.1 * p, Math.min(st.right - 0.3 * p, e.x + e.half + 2.5 * p), e.y);
     });
     // the same for the reading with chords: its rests, and a tie from each head to the next head at the same height
-    for (const e of elems) if (e.kind === 'rest' && !mine.some(n => n.x >= e.box[0] - 0.3 * p && n.x <= e.box[0] + e.box[2] + 0.3 * p && n.y >= e.box[1] - 0.3 * p && n.y <= e.box[1] + e.box[3] + 0.3 * p)) pe.push({ kind: 'rest', x: e.x, y: e.y, d: e.d, dotted: e.dotted, multi: e.multi, box: e.box });
+    for (const e of elems) if (e.kind === 'rest' && !mine.some(n => { const mg = (n.small ? -0.2 : 0.3) * p; return n.x >= e.box[0] - mg && n.x <= e.box[0] + e.box[2] + mg && n.y >= e.box[1] - mg && n.y <= e.box[1] + e.box[3] + mg; })) pe.push({ kind: 'rest', x: e.x, y: e.y, d: e.d, dotted: e.dotted, multi: e.multi, box: e.box });
     pe.sort((a, b) => a.x - b.x);
     pe.forEach((e, i) => {
       if (e.kind !== 'note') return;
