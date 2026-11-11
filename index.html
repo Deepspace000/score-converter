@@ -27,7 +27,19 @@ button.on,button.fold.open{background:#dbeafe;border-color:var(--acc);color:var(
 #playBtn:hover,button.primary:hover{background:var(--acc2)}
 #playBtn{min-width:86px}
 input[type=range],input[type=checkbox]{accent-color:var(--acc)}
-@media (pointer:coarse){button,select{min-height:44px;padding:8px 12px}}
+@media (pointer:coarse){button,select{min-height:44px;padding:8px 12px}input[type=number],input[type=text],select{font-size:16px}}
+#moreBtn{display:none}
+#cfStop{display:none;flex:none}
+@media (max-width:760px),(max-height:560px){
+  #moreBtn{display:inline-block}
+  #topbar{padding:6px 8px;gap:6px 8px}
+  #topbar .appname{font-size:16px}
+  #topbar:not(.more) .xtra{display:none!important}
+  #statusLine{padding:3px 8px}
+  #scoreBox{margin:0 6px 6px}
+  .foldp{padding:8px}
+  #pdfref{inset:4px;padding:8px}
+}
 .foldp{flex:none;display:none;background:var(--panel);border-bottom:1px solid var(--line);padding:10px 14px;max-height:46vh;overflow:auto}
 .foldp.open{display:block}
 .foldp .controls+.controls{margin-top:8px}
@@ -108,13 +120,14 @@ body.bmpick #recscore,body.bmpick #recscore *{cursor:url("data:image/svg+xml,%3C
   <button id="photoBtn" title="Photos of printed music, from the camera or from your pictures. You tidy each one before it is read.">Photo…</button>
   <button id="playBtn">▶ Play</button>
   <label title="Crotchet beats in a minute">Tempo <input type="number" id="bpm" value="60" min="30" max="240" style="width:64px"></label>
-  <label>From <select id="fromSel" style="max-width:200px"></select></label>
-  <label>Bar <input type="number" id="fromBar" min="1" placeholder="–" style="width:58px"></label>
-  <button id="followBtn" class="on" title="Keep the music that is playing in view (scrolling by hand pauses it)">Follow</button>
-  <button id="bmBtn" title="Press, then click the first bar and the last bar of the passage in the score. The bookmark appears above the score; press it to play the passage, and switch Loop on to go round it.">+ Bookmark</button>
-  <button id="lpBtn" title="Play the bars chosen here round and round, for practising">Loop</button>
-  <label title="The bars to play round and round">bars <input type="number" id="lpFrom" min="1" placeholder="–" style="width:56px"> to <input type="number" id="lpTo" min="1" placeholder="–" style="width:56px"></label>
-  <label title="Clicks before the music starts, and before each time round a loop">Count-in <select id="cntSel"><option value="0">none</option><option value="1">1 bar</option><option value="2">2 bars</option></select></label>
+  <label class="xtra">From <select id="fromSel" style="max-width:200px"></select></label>
+  <label class="xtra">Bar <input type="number" id="fromBar" min="1" placeholder="–" style="width:58px"></label>
+  <button id="followBtn" class="on xtra" title="Keep the music that is playing in view (scrolling by hand pauses it)">Follow</button>
+  <button id="bmBtn" class="xtra" title="Press, then click the first bar and the last bar of the passage in the score. The bookmark appears above the score; press it to play the passage, and switch Loop on to go round it.">+ Bookmark</button>
+  <button id="lpBtn" class="xtra" title="Play the bars chosen here round and round, for practising">Loop</button>
+  <label class="xtra" title="The bars to play round and round">bars <input type="number" id="lpFrom" min="1" placeholder="–" style="width:56px"> to <input type="number" id="lpTo" min="1" placeholder="–" style="width:56px"></label>
+  <label class="xtra" title="Clicks before the music starts, and before each time round a loop">Count-in <select id="cntSel"><option value="0">none</option><option value="1">1 bar</option><option value="2">2 bars</option></select></label>
+  <button id="moreBtn" title="Where to start, follow, bookmarks, loop and count-in">More ▾</button>
   <label id="partPick" style="display:none">Part <select id="partSel"></select></label>
   <button id="fullBtn" style="display:none" title="Show every part's staff together, or only the part you are working on">All parts</button>
   <span style="flex:1"></span>
@@ -183,7 +196,7 @@ body.bmpick #recscore,body.bmpick #recscore *{cursor:url("data:image/svg+xml,%3C
 </div>
 
 <div id="bmBar"></div>
-<div id="statusLine"><span class="score" id="recstat"></span></div>
+<div id="statusLine"><span class="score" id="recstat"></span><button id="cfStop">Stop careful scan</button></div>
 <div id="scoreBox"><h2 id="rectitle"></h2><div id="recscore"></div></div>
 
 <div id="zipDlg"><div class="zbox">
@@ -235,7 +248,7 @@ const NOEL={},NODEF={mode:'explore',clef:'treble',acc:'all',frets:'7',placeSel:'
 const $=id=>document.getElementById(id)||NOEL[id]||(NOEL[id]=Object.assign(document.createElement('input'),{value:NODEF[id]||'',checked:id==='snd'||id==='lbl'}));
 const adviceStart=()=>{},adviceStop=()=>{};
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const APP_VERSION='5.18';
+const APP_VERSION='5.19';
 $('ver').textContent='v'+APP_VERSION;
 // iPads keep old copies of web pages for a while: if a newer version is online, load it (once per version)
 (async()=>{try{
@@ -2144,6 +2157,7 @@ async function rsRead(k,M,G,sp){
   const Fz=M.F,ck=G.pg+':'+Fz;let c=rsCache.get(ck);
   if(!c&&rsRead.fast&&Fz!==1){   // (careful scan: the page is drawn once and that picture is made larger or smaller, which is much quicker)
     let b0=rsCache.get(G.pg+':1');if(!b0){b0=await renderScan(G.pg,page.W);rsCache.set(G.pg+':1',b0);}
+    if(TOUCH)[...rsCache.keys()].forEach(q=>{if(q!==G.pg+':1'){freeCanvas(rsCache.get(q));rsCache.delete(q);}});   // (one enlarged picture at a time)
     c=document.createElement('canvas');c.width=Math.round(b0.width*Fz);c.height=Math.round(b0.height*Fz);const cg=c.getContext('2d',{willReadFrequently:true});cg.imageSmoothingQuality='high';cg.drawImage(b0,0,0,c.width,c.height);rsCache.set(ck,c);}
   if(!c){c=await renderScan(G.pg,Math.round(page.W*Fz));rsCache.set(ck,c);}
   const hx=Math.min(...grp.map(x=>x.musicStart))-0.25*p,L0=Math.max(0,left-3*p),xe=Math.min(page.W,x1+0.5*p);
@@ -2224,7 +2238,7 @@ async function carefulPass(){
   if(!bad.length||!sc.parts.every(p=>p.pb)||!scan.kind)return;
   stopPlay();rsState.clear();rsState.owner=sc.parts[0];
   const before=JSON.stringify(sc.parts.map(p=>({items:p.items,v2:p.v2||null}))),left=[],t0=performance.now();let fixed=0,n=0;
-  carefulPass.stop=false;rsRead.fast=true;let lastPg=-1;
+  carefulPass.stop=false;carefulPass.on=true;$('cfStop').style.display='inline-block';rsRead.fast=true;let lastPg=-1;
   for(const k of bad){
     if(carefulPass.stop){left.push(k);continue;}
     n++;let best=null;
@@ -2235,7 +2249,7 @@ async function carefulPass(){
         const votes=new Map();
         for(let mi=0;mi<RS_METHODS.length&&!carefulPass.stop;mi++){
           const per1=(performance.now()-t0)/Math.max(1,(n-1)*RS_METHODS.length+mi),leftS=per1*((bad.length-n+1)*RS_METHODS.length-mi)/1000;
-          stat(`Careful scan: bar ${k+1} (${n} of ${bad.length} doubtful bars), way ${mi+1} of ${RS_METHODS.length}…`+(n>1||mi>1?` ${timeLeft(leftS)[0].toUpperCase()+timeLeft(leftS).slice(1)} left.`:'')+' Press Esc to stop.');await tick();
+          stat(`Careful scan: bar ${k+1} (${n} of ${bad.length} doubtful bars), way ${mi+1} of ${RS_METHODS.length}…`+(n>1||mi>1?` ${timeLeft(leftS)[0].toUpperCase()+timeLeft(leftS).slice(1)} left.`:''));await tick();
           let per=null;try{per=await rsRead(k,RS_METHODS[mi],G,sp);}catch(e){console.error(e);}
           if(!per||per.bad)continue;
           const todo=rsPlan(k,grp,per);if(!todo)continue;
@@ -2246,7 +2260,7 @@ async function carefulPass(){
     }catch(e){console.error(e);}
     if(best){rsApply(k,best.todo);fixed++;}else left.push(k);
   }
-  rsCache.forEach(freeCanvas);rsCache.clear();rsRead.fast=false;sc.badBars=left;
+  rsCache.forEach(freeCanvas);rsCache.clear();rsRead.fast=false;sc.badBars=left;carefulPass.on=false;$('cfStop').style.display='';
   if(fixed){rsUndo.push(before);if(rsUndo.length>30)rsUndo.shift();$('rsUndo').style.display='';sc.sel=-1;sc.cur=sc.items.length;sc.parts.forEach(p=>{p.hist=[];});keepScroll(drawRecording);buildParts();}
   stat(`Careful scan: ${fixed} of ${bad.length} doubtful bar${bad.length>1?'s':''} now add${fixed===1?'s':''} up`+(fixed?' (Undo re-scan under Edit puts the first reading back).':'.')+(left.length?` Still to check: bar${left.length>1?'s':''} ${left.map(x=>x+1).join(', ')}.`:''));
 }
@@ -2628,6 +2642,7 @@ addEventListener('drop',e=>{e.preventDefault();document.body.classList.remove('d
 function openFold(id,open){
   document.querySelectorAll('.foldp').forEach(x=>x.classList.toggle('open',x.id===id&&open));
   document.querySelectorAll('.fold').forEach(x=>x.classList.toggle('open',x.dataset.p===id&&open));
+  if(open&&$('topbar').classList.contains('more'))$('moreBtn').click();   // (small screens: one thing open at a time)
   if(id==='pSet'&&open)drawStaff(st.show||[]);
   fitFold();
 }
@@ -2638,6 +2653,19 @@ function fitFold(){
   f.style.maxHeight=Math.round(Math.max(110,Math.min(innerHeight*0.46,innerHeight-rest-30-14-150)))+'px';
 }
 document.querySelectorAll('.fold').forEach(b=>b.onclick=()=>openFold(b.dataset.p,!$(b.dataset.p).classList.contains('open')));
+$('moreBtn').onclick=()=>{const on=$('topbar').classList.toggle('more');$('moreBtn').textContent=on?'Less ▴':'More ▾';$('moreBtn').classList.toggle('on',on);fitFold();};
+$('cfStop').onclick=()=>{carefulPass.stop=true;};
+// on a phone or tablet the file chooser greys out kinds of file it does not know by name (.mxl, .musicxml): let it offer everything
+if(TOUCH)$('impFile').removeAttribute('accept');
+// the screen of a phone or tablet stays on while music plays or a scan runs
+let wlock=null;
+setInterval(async()=>{
+  const want=!document.hidden&&(!!playing||$('pdfref').classList.contains('busy')||!!carefulPass.on);
+  try{
+    if(want&&!wlock&&navigator.wakeLock){wlock=await navigator.wakeLock.request('screen');wlock.addEventListener('release',()=>{wlock=null;});}
+    else if(!want&&wlock){const w=wlock;wlock=null;await w.release();}
+  }catch(e){}
+},2000);
 $('partSel').onchange=()=>usePart(+$('partSel').value);
 $('neckSel').onchange=()=>{sc.neckPart=+$('neckSel').value;keep('score-conv-neckmode',sc.neckPart<0?'every':null);
   st.hl={};buildPartPick();fitFold();if(playing)paintPlay();if(st.mode!=='explore')setMode();   // (a quiz moves to the neck it now uses)
